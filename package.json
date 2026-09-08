@@ -1,0 +1,36 @@
+{
+  "name": "hanzi-quest",
+  "productName": "Hanzi Quest",
+  "version": "1.0.0",
+  "description": "汉字冒险 — an 8-bit Mandarin reading adventure across HSK levels 1-6",
+  "author": "Hanzi Quest",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "io.hanziquest.app",
+    "productName": "Hanzi Quest",
+    "files": [
+      "main.js",
+      "index.html",
+      "build/icon.png"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Education",
+      "icon": "build/icon.png",
+      "maintainer": "hanzi-quest",
+      "synopsis": "8-bit Mandarin reading adventure"
+    }
+  }
+}

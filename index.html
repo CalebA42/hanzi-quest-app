@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汉字冒险 · Hanzi Quest</title>
+<style>
+/* ============================================================
+   HANZI QUEST — design tokens
+   ink cave-dark, amber torchlight, jade for "go", lantern red
+   for danger. CJK face carries the content; monospace carries
+   the UI chrome, like a cartridge-era menu.
+   ============================================================ */
+:root{
+  --ink:#141021;          /* page night */
+  --panel:#221b36;        /* dialogue panels */
+  --panel-2:#2b2344;      /* raised panels */
+  --stone:#4a3f6b;        /* borders */
+  --paper:#f2e9d8;        /* main text */
+  --dim:#9a8fb8;          /* secondary text */
+  --amber:#ffb347;        /* torchlight / pinyin */
+  --jade:#8ce08a;         /* positive / choices */
+  --blood:#e0566b;        /* damage / hearts */
+  --lantern:#d94f4f;      /* accents, title */
+  --cjk:"Noto Sans CJK SC","Noto Sans SC","PingFang SC","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif;
+  --ui:"DejaVu Sans Mono","Menlo","Consolas","Courier New",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #241b3e 0%, var(--ink) 60%);
+  color:var(--paper);
+  font-family:var(--cjk);
+  display:flex;justify-content:center;
+  padding:18px 10px 40px;
+}
+#frame{
+  width:100%;max-width:720px;
+}
+/* ---- cartridge frame around the whole game ---- */
+#cart{
+  border:3px solid var(--stone);
+  background:var(--panel);
+  box-shadow:0 0 0 3px var(--ink), 0 0 0 6px #332a52, 0 14px 40px rgba(0,0,0,.6);
+  border-radius:6px;overflow:hidden;
+}
+/* ---- top status bar ---- */
+#hud{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;background:var(--panel-2);
+  border-bottom:3px solid var(--stone);
+  font-family:var(--ui);font-size:12px;letter-spacing:1px;
+}
+#hud .tag{color:var(--dim);text-transform:uppercase}
+#hearts{color:var(--blood);font-size:14px;letter-spacing:2px}
+#hud .grow{flex:1}
+.hudbtn{
+  font-family:var(--ui);font-size:11px;letter-spacing:1px;
+  background:var(--panel);color:var(--paper);
+  border:2px solid var(--stone);border-radius:4px;
+  padding:4px 10px;cursor:pointer;box-shadow:0 2px 0 #171226;
+}
+.hudbtn:hover{border-color:var(--amber);color:var(--amber)}
+.hudbtn:active{transform:translateY(2px);box-shadow:none}
+/* ---- pixel viewport ---- */
+#viewwrap{background:#0d0a17;border-bottom:3px solid var(--stone);position:relative}
+#view{width:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+#lvlbadge{
+  position:absolute;top:8px;left:8px;
+  font-family:var(--ui);font-size:11px;letter-spacing:1px;
+  background:rgba(20,16,33,.8);border:2px solid var(--stone);
+  color:var(--amber);padding:3px 8px;border-radius:4px;
+}
+/* ---- dialogue area ---- */
+#stage{padding:14px 14px 18px;min-height:230px}
+.bubble{
+  position:relative;
+  background:var(--ink);
+  border:2px solid var(--stone);
+  border-radius:8px;
+  padding:12px 78px 12px 14px;
+  margin:0 0 10px;
+  font-size:23px;line-height:2.05;
+  animation:pop .18s ease-out;
+}
+.bubble.sys{font-family:var(--ui);font-size:12px;color:var(--dim);
+  padding:8px 12px;line-height:1.6;border-style:dashed}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* per-bubble helper buttons */
+.helpers{position:absolute;top:6px;right:6px;display:flex;gap:4px}
+.mini{
+  font-family:var(--ui);font-size:10px;line-height:1;
+  background:var(--panel-2);color:var(--dim);
+  border:2px solid var(--stone);border-radius:4px;
+  padding:4px 6px;cursor:pointer;
+}
+.mini:hover{color:var(--amber);border-color:var(--amber)}
+.mini.on{color:var(--ink);background:var(--amber);border-color:var(--amber)}
+/* ---- interactive words ---- */
+.w{cursor:help;border-bottom:1px dotted rgba(154,143,184,.55);transition:background .12s}
+.w:hover{background:rgba(255,179,71,.18);border-bottom-color:var(--amber)}
+.punct{color:var(--dim)}
+ruby rt{
+  font-size:11px;color:var(--amber);opacity:0;letter-spacing:0;
+  transition:opacity .15s;font-family:var(--ui);
+}
+.show-py ruby rt{opacity:1}
+/* speaker name chip */
+.chip{
+  display:inline-block;font-family:var(--ui);font-size:11px;letter-spacing:1px;
+  color:var(--amber);border:1px solid var(--stone);border-radius:3px;
+  padding:1px 6px;margin-right:8px;vertical-align:middle;background:var(--panel-2);
+}
+/* ---- choices ---- */
+#choices{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.choice{
+  text-align:left;font-family:var(--cjk);font-size:21px;line-height:1.9;
+  background:var(--panel-2);color:var(--paper);
+  border:2px solid var(--stone);border-radius:8px;
+  padding:9px 14px 9px 40px;cursor:pointer;position:relative;
+  box-shadow:0 3px 0 #171226;
+}
+.choice::before{
+  content:"▶";position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  color:var(--jade);font-size:12px;
+}
+.choice:hover{border-color:var(--jade);background:#2f2850}
+.choice:active{transform:translateY(3px);box-shadow:none}
+.choice.danger::before{color:var(--blood)}
+.choice.danger:hover{border-color:var(--blood)}
+/* ---- tooltip ---- */
+#tip{
+  position:fixed;z-index:50;pointer-events:none;display:none;
+  background:#0d0a17;border:2px solid var(--amber);border-radius:6px;
+  padding:8px 12px;max-width:240px;box-shadow:0 6px 18px rgba(0,0,0,.6);
+}
+#tip .th{font-size:20px}
+#tip .tp{font-family:var(--ui);font-size:13px;color:var(--amber);margin:2px 0}
+#tip .te{font-family:var(--ui);font-size:12px;color:var(--dim)}
+/* ---- title & menus ---- */
+.center{display:flex;flex-direction:column;align-items:center;gap:14px;padding:34px 16px 40px;text-align:center}
+#bigtitle{
+  font-size:56px;font-weight:900;letter-spacing:6px;color:var(--paper);
+  text-shadow:4px 4px 0 var(--lantern), 8px 8px 0 #1d1633;
+}
+.subtitle{font-family:var(--ui);font-size:12px;letter-spacing:4px;color:var(--dim);text-transform:uppercase}
+.menubtn{
+  width:min(320px,90%);font-family:var(--cjk);font-size:22px;
+  background:var(--panel-2);color:var(--paper);
+  border:2px solid var(--stone);border-radius:8px;padding:12px;
+  cursor:pointer;box-shadow:0 3px 0 #171226;
+}
+.menubtn small{display:block;font-family:var(--ui);font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:4px}
+.menubtn:hover:not(:disabled){border-color:var(--amber)}
+.menubtn:active:not(:disabled){transform:translateY(3px);box-shadow:none}
+.menubtn:disabled{opacity:.4;cursor:not-allowed}
+.lvlcard{width:min(320px,90%)}
+.lock{color:var(--dim)}
+/* combat HP rows */
+.hprow{display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--ui);font-size:13px;margin-bottom:8px;
+  background:var(--panel-2);border:2px solid var(--stone);border-radius:6px;padding:6px 12px}
+.hprow .hh{color:var(--blood);letter-spacing:2px}
+/* toast */
+#toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+  background:var(--panel-2);border:2px solid var(--amber);color:var(--amber);
+  font-family:var(--ui);font-size:13px;letter-spacing:1px;
+  padding:8px 16px;border-radius:6px;opacity:0;transition:all .25s;z-index:60;
+}
+#toast.show{opacity:1;transform:translateX(-50%)}
+.footer{padding:8px 12px;font-family:var(--ui);font-size:10px;color:#5d5480;
+  letter-spacing:1px;text-align:center}
+@media (prefers-reduced-motion: reduce){
+  .bubble{animation:none}
+}
+@media (max-width:520px){
+  .bubble{font-size:20px;padding-right:70px}
+  .choice{font-size:19px}
+  #bigtitle{font-size:40px}
+}
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="cart">
+    <div id="hud">
+      <span class="tag">HANZI·QUEST</span>
+      <span id="hudlvl" class="tag"></span>
+      <span id="hearts"></span>
+      <span class="grow"></span>
+      <button class="hudbtn" id="btnSave" title="Save progress">存 SAVE</button>
+      <button class="hudbtn" id="btnHome" title="Back to title">主页 HOME</button>
+    </div>
+    <div id="viewwrap">
+      <canvas id="view" width="320" height="150"></canvas>
+      <div id="lvlbadge"></div>
+    </div>
+    <div id="stage"></div>
+    <div class="footer">HOVER A WORD FOR HELP · 拼 = PINYIN · 🔊 = LISTEN</div>
+  </div>
+</div>
+<div id="tip"><div class="th"></div><div class="tp"></div><div class="te"></div></div>
+<div id="toast"></div>
+<script>
+/* ============================================================
+   DICTIONARY — every word used in the game.
+   key: simplified hanzi word → [pinyin, english gloss]
+   Level scripts stay inside HSK vocab for their tier, with a
+   handful of glossed flavor words (cave, key, wolf...).
+   ============================================================ */
+const D = {
+"你好":["nǐhǎo","hello"],"你":["nǐ","you"],"我":["wǒ","I / me"],"他":["tā","he"],
+"它":["tā","it (animal/thing)"],"是":["shì","to be"],"在":["zài","at / in"],
+"一个":["yí ge","one / a"],"三个":["sān ge","three"],"一只":["yì zhī","one (animal)"],
+"一条":["yì tiáo","one (long thing / fish)"],"山洞":["shāndòng","cave"],
+"里":["lǐ","inside"],"看见":["kànjiàn","to see"],"门":["mén","door"],
+"大":["dà","big"],"小":["xiǎo","small"],"中间":["zhōngjiān","middle"],
+"的":["de","(possessive 'of')"],"很":["hěn","very"],"热":["rè","hot"],
+"不能":["bù néng","cannot"],"开":["kāi","to open"],"回去":["huíqù","to go back"],
+"后面":["hòumiàn","behind / the back"],"有":["yǒu","to have / there is"],
+"老鼠":["lǎoshǔ","rat / mouse"],"不":["bù","not"],"高兴":["gāoxìng","happy"],
+"打":["dǎ","to hit"],"说":["shuō","to say"],"关门":["guān mén","close the door"],
+"不会":["bú huì","cannot / doesn't know how"],"说话":["shuōhuà","to speak"],
+"来":["lái","to come"],"跑":["pǎo","to run"],"了":["le","(completed action)"],
+"钥匙":["yàoshi","key"],"拿":["ná","to take"],"猫":["māo","cat"],
+"想":["xiǎng","to want / think"],"要":["yào","to want"],"什么":["shénme","what"],
+"找":["zhǎo","to look for"],"钱":["qián","money"],"谁":["shéi","who"],
+"叫":["jiào","to be called"],"小花":["Xiǎohuā","Xiaohua (a name)"],
+"再见":["zàijiàn","goodbye"],"吃的":["chīde","food (something to eat)"],
+"吗":["ma","(yes/no question)"],"给":["gěi","to give"],"鱼":["yú","fish"],
+"谢谢":["xièxie","thank you"],"能":["néng","can / to be able"],
+"黑":["hēi","dark / black"],"听见":["tīngjiàn","to hear"],"狗":["gǒu","dog"],
+"声音":["shēngyīn","sound / voice"],"走":["zǒu","to walk / go"],
+"进去":["jìnqù","to go in"],"看着":["kànzhe","looking at"],
+"前面":["qiánmiàn","in front"],"很多":["hěn duō","a lot of"],
+"没有":["méiyǒu","to not have"],"太阳":["tàiyáng","sun"],"光":["guāng","light"],
+"找到":["zhǎodào","to find (found)"],"出口":["chūkǒu","exit"],
+"出去":["chūqù","to go out"],"和":["hé","and"],"山":["shān","mountain"],
+"恭喜":["gōngxǐ","congratulations"],"第一关":["dì-yī guān","level 1"],
+"完成":["wánchéng","to complete"],"休息":["xiūxi","to rest"],
+"累":["lèi","tired"],"太":["tài","too (much)"],"睡觉":["shuìjiào","to sleep"],
+"好吧":["hǎo ba","okay / fine"],"再":["zài","again"],"看看":["kànkan","take a look"],
+"现在":["xiànzài","now"],"这":["zhè","this"],"那":["nà","that"],
+"好":["hǎo","good"],"哪儿":["nǎr","where"],"去":["qù","to go"],
+"帮":["bāng","to help"],"可以":["kěyǐ","can / may"],"朋友":["péngyou","friend"],
+"东西":["dōngxi","thing / stuff"],"慢慢地":["mànmàn de","slowly"],
+/* ---- level 2 additions (HSK2) ---- */
+"已经":["yǐjīng","already"],"但是":["dànshì","but"],"森林":["sēnlín","forest"],
+"天":["tiān","sky / day"],"开始":["kāishǐ","to begin"],"路":["lù","road / way"],
+"回家":["huí jiā","to go home"],"往":["wǎng","toward"],
+"左边":["zuǒbiān","left side"],"右边":["yòubiān","right side"],
+"爬":["pá","to climb"],"到":["dào","to / to arrive"],"树":["shù","tree"],
+"上":["shàng","up / on"],"从":["cóng","from"],"水":["shuǐ","water"],
+"火":["huǒ","fire"],"可能":["kěnéng","maybe"],"人":["rén","person"],
+"下来":["xiàlái","to come down"],"河":["hé","river"],"快":["kuài","fast"],
+"过去":["guòqù","to cross / go over"],"鸟":["niǎo","bird"],
+"为什么":["wèishénme","why"],"这儿":["zhèr","here"],"会":["huì","can / know how"],
+"笑":["xiào","to laugh / smile"],"因为":["yīnwèi","because"],
+"奇怪":["qíguài","strange"],"旁边":["pángbiān","beside"],
+"小心":["xiǎoxīn","careful"],"狼":["láng","wolf"],"眼睛":["yǎnjing","eyes"],
+"红色":["hóngsè","red (color)"],"生气":["shēngqì","angry"],
+"老人":["lǎorén","old man"],"每天":["měitiān","every day"],
+"都":["dōu","all / always"],"带":["dài","to lead / bring"],
+"喜欢":["xǐhuan","to like"],"安静":["ānjìng","quiet"],
+"跟":["gēn","with / to follow"],"长":["cháng","long"],
+"时间":["shíjiān","time"],"最后":["zuìhòu","finally / at last"],
+"家":["jiā","home"],"非常":["fēicháng","extremely"],
+"第二关":["dì-èr guān","level 2"],"第三关":["dì-sān guān","level 3"],
+"还在":["hái zài","still (in progress)"],"做":["zuò","to make / do"],
+"知道":["zhīdào","to know"],"看":["kàn","to look / see"],
+"一下":["yíxià","a bit / briefly"],"出":["chū","to exit / go out"],
+"只":["zhī","(measure word for animals)"],"我们":["wǒmen","we / us"],
+/* ---- level 3 additions (HSK3) ---- */
+"早上":["zǎoshang","morning"],"突然":["tūrán","suddenly"],
+"发现":["fāxiàn","to discover"],"不见了":["bú jiàn le","gone / missing"],
+"着":["zhe","(ongoing state)"],"地上":["dì shang","on the ground"],
+"脚印":["jiǎoyìn","footprint"],"跟着":["gēnzhe","to follow"],
+"先":["xiān","first"],"吃":["chī","to eat"],"早饭":["zǎofàn","breakfast"],
+"觉得":["juéde","to feel / think"],"好多了":["hǎo duō le","much better"],
+"问":["wèn","to ask"],"邻居":["línjū","neighbor"],"昨天":["zuótiān","yesterday"],
+"晚上":["wǎnshang","evening / night"],"有人":["yǒu rén","someone"],
+"城里":["chéng lǐ","in town"],"小城":["xiǎochéng","small town"],
+"街上":["jiē shang","on the street"],"地方":["dìfang","place"],
+"商店":["shāngdiàn","shop / store"],"图书馆":["túshūguǎn","library"],
+"公园":["gōngyuán","park"],"今天":["jīntiān","today"],
+"男人":["nánrén","man"],"买":["mǎi","to buy"],
+"看起来":["kàn qǐlái","to look like / seem"],"害怕":["hàipà","afraid"],
+"那边":["nàbiān","over there"],"女孩":["nǚhái","girl"],
+"她":["tā","she"],"看书":["kàn shū","to read (a book)"],
+"包":["bāo","bag"],"下":["xià","under / below"],
+"名字":["míngzi","name"],"起来":["qǐlái","to get up"],
+"醒":["xǐng","to wake up"],"站":["zhàn","to stand"],
+"就":["jiù","then / right away"],"老":["lǎo","old"],
+"楼":["lóu","building"],"楼上":["lóu shàng","upstairs / rooftop"],
+"也":["yě","also"],"上去":["shàngqù","to go up"],
+"月亮":["yuèliang","moon"],"把":["bǎ","(takes the object first)"],
+"对不起":["duìbuqǐ","sorry"],"孩子":["háizi","child"],
+"病":["bìng","sick / illness"],"需要":["xūyào","to need"],
+"一点":["yìdiǎn","a little"],"相信":["xiāngxìn","to believe / trust"],
+"帮助":["bāngzhù","to help"],"哭":["kū","to cry"],
+"还给":["huán gěi","to give back"],"拿回":["ná huí","to take back"],
+"有点":["yǒudiǎn","a bit"],"难过":["nánguò","sad"],
+"小偷":["xiǎotōu","thief"],"第四关":["dì-sì guān","level 4"],
+"你们":["nǐmen","you (plural)"],"一起":["yìqǐ","together"],
+"新":["xīn","new"],"回":["huí","to return"],
+/* ---- level 4 additions (HSK4) ---- */
+"冬天":["dōngtiān","winter"],"医生":["yīshēng","doctor"],
+"只有":["zhǐyǒu","only"],"海上":["hǎi shang","on the sea"],
+"小岛":["xiǎodǎo","small island"],"一种":["yì zhǒng","one kind of"],
+"蓝色":["lánsè","blue"],"花":["huā","flower"],"药":["yào","medicine"],
+"危险":["wēixiǎn","dangerous"],"愿意":["yuànyì","to be willing"],
+"最近":["zuìjìn","recently"],"天气":["tiānqì","weather"],
+"常常":["chángcháng","often"],"刮":["guā","to blow (wind)"],
+"大风":["dàfēng","strong wind"],"而且":["érqiě","moreover"],
+"听说":["tīngshuō","to hear (it said)"],"岛":["dǎo","island"],
+"蛇":["shé","snake"],"怕":["pà","to fear"],"海边":["hǎibiān","seaside"],
+"船长":["chuánzhǎng","captain"],"船":["chuán","boat / ship"],
+"真的":["zhēn de","really"],"过":["guo","(have done before)"],
+"一次":["yí cì","one time / once"],"送":["sòng","to take (someone) / see off"],
+"边":["biān","edge / side"],"条":["tiáo","(measure: long things)"],
+"可怕":["kěpà","scary / terrible"],"吧":["ba","(suggestion particle)"],
+"一会儿":["yíhuìr","a little while"],"变":["biàn","to change / become"],
+"下大雨":["xià dàyǔ","to rain heavily"],"里面":["lǐmiàn","inside"],
+"努力":["nǔlì","to work hard"],"虽然":["suīrán","although"],
+"安全":["ānquán","safe"],"地":["de","(adverb marker)"],
+"经过":["jīngguò","to pass through"],"大雨":["dàyǔ","heavy rain"],
+"真":["zhēn","truly / really"],"勇敢":["yǒnggǎn","brave"],
+"上上下下":["shàngshàng-xiàxià","up and down"],"难受":["nánshòu","to feel awful"],
+"洞":["dòng","cave / hole"],"进":["jìn","to enter"],
+"找找":["zhǎozhao","look around for"],"前":["qián","front / forward"],
+"大声":["dàshēng","loudly"],"睡":["shuì","to sleep"],
+"一朵":["yì duǒ","one (flower)"],"时候":["shíhou","time / moment"],
+"又":["yòu","again / once more"],"从来":["cónglái","(never) ever"],
+"别":["bié","don't"],"这种":["zhè zhǒng","this kind of"],
+"一百":["yìbǎi","one hundred"],"年":["nián","year"],
+"才":["cái","only then"],"孩子们":["háizimen","children"],
+"拿走":["ná zǒu","to take away"],"死":["sǐ","to die"],
+"怎么办":["zěnme bàn","what to do?"],"种子":["zhǒngzi","seed"],
+"这样":["zhèyàng","this way"],"回来":["huílái","to come back"],
+"这里":["zhèlǐ","here"],"以后":["yǐhòu","after / later"],
+"用":["yòng","to use"],"还":["hái","also / in addition"],
+"种":["zhòng","to plant"],"大家":["dàjiā","everyone"],
+"感谢":["gǎnxiè","to thank"],"第五关":["dì-wǔ guān","level 5"],
+/* ---- level 5 additions (HSK5) ---- */
+"春天":["chūntiān","spring"],"收到":["shōudào","to receive"],
+"一封":["yì fēng","one (letter)"],"信":["xìn","letter"],
+"村子":["cūnzi","village"],"写":["xiě","to write"],
+"村长":["cūnzhǎng","village chief"],"雪山":["xuěshān","snow mountain"],
+"还有":["háiyǒu","and also"],"巨大":["jùdà","huge"],
+"影子":["yǐngzi","shadow"],"请":["qǐng","please / to invite"],
+"马上":["mǎshàng","right away"],"上山":["shàng shān","to go up the mountain"],
+"问问":["wènwen","ask around"],"村里":["cūn lǐ","in the village"],
+"准备":["zhǔnbèi","to prepare"],"那个":["nàge","that one"],
+"听":["tīng","to listen"],"意思":["yìsi","meaning / interesting"],
+"一件":["yí jiàn","one (clothing item)"],"厚":["hòu","thick"],
+"衣服":["yīfu","clothes / coat"],"冷":["lěng","cold"],
+"一定":["yídìng","definitely / must"],"穿":["chuān","to wear"],
+"风":["fēng","wind"],"像":["xiàng","to be like"],
+"刀子":["dāozi","knife"],"一样":["yíyàng","the same as"],
+"不得不":["bùdébù","to have no choice but"],"回到":["huídào","to return to"],
+"雪":["xuě","snow"],"传":["chuán","to carry / spread (sound)"],
+"出来":["chūlái","to come out"],"雪怪":["xuěguài","snow monster"],
+"坐":["zuò","to sit"],"正在":["zhèngzài","in the middle of"],
+"脚":["jiǎo","foot"],"小小的":["xiǎoxiǎo de","tiny"],
+"怪物":["guàiwu","monster"],"小鸟":["xiǎoniǎo","little bird"],
+"翅膀":["chìbǎng","wing"],"受伤":["shòushāng","to be injured"],
+"为":["wèi","for / because of"],"别人":["biérén","other people"],
+"一":["yī","one / as soon as"],"其实":["qíshí","actually"],
+"伤害":["shānghài","to hurt / harm"],"掉":["diào","to fall / drop"],
+"怎么":["zěnme","how"],"放":["fàng","to put / place"],
+"温暖":["wēnnuǎn","warm"],"几":["jǐ","a few"],
+"下山":["xià shān","to go down the mountain"],"村民":["cūnmín","villagers"],
+"成":["chéng","to become"],"第六关":["dì-liù guān","level 6"],
+"深处":["shēnchù","the depths"],"永远":["yǒngyuǎn","forever"],
+"到底":["dàodǐ","after all / in the end"],"不是":["bú shì","is not"],
+"坏人":["huàirén","bad person"],"想起":["xiǎngqǐ","to recall"],
+/* ---- level 6 additions (HSK6) ---- */
+"一位":["yí wèi","one (respected person)"],"有名":["yǒumíng","famous"],
+"冒险者":["màoxiǎnzhě","adventurer"],"传说":["chuánshuō","legend"],
+"最":["zuì","the most"],"高":["gāo","tall / high"],
+"山顶":["shāndǐng","mountain top"],"一座":["yí zuò","one (mountain/building)"],
+"古庙":["gǔmiào","ancient temple"],"庙":["miào","temple"],
+"世界":["shìjiè","world"],"宝藏":["bǎozàng","treasure"],
+"终于":["zhōngyú","finally"],"石人":["shírén","stone man"],
+"亮":["liàng","to light up / bright"],"回答":["huídá","to answer"],
+"问题":["wèntí","question / problem"],"答":["dá","to answer"],
+"错":["cuò","wrong"],"第一个":["dì-yī ge","the first"],
+"越":["yuè","the more..."],"洗":["xǐ","to wash"],
+"脏":["zāng","dirty"],"手":["shǒu","hand"],
+"想想":["xiǎngxiang","think it over"],"对":["duì","correct"],
+"第二个":["dì-èr ge","the second"],"白天":["báitiān","daytime"],
+"见":["jiàn","to see"],"星星":["xīngxing","stars"],
+"得":["de","(degree marker)"],"比":["bǐ","compared to"],
+"多":["duō","many / more"],"智慧":["zhìhuì","wisdom"],
+"倒":["dǎo","to fall over"],"金子":["jīnzi","gold"],
+"宝石":["bǎoshí","gemstone"],"一面":["yí miàn","one (mirror)"],
+"古老":["gǔlǎo","ancient"],"镜子":["jìngzi","mirror"],
+"一块":["yí kuài","one (piece)"],"石碑":["shíbēi","stone tablet"],
+"真正":["zhēnzhèng","true / real"],"自己":["zìjǐ","oneself"],
+"一路":["yílù","the whole way"],"朋友们":["péngyoumen","friends"],
+"明白":["míngbai","to understand"],"学":["xué","to learn"],
+"汉字":["hànzì","Chinese characters"],"冒险":["màoxiǎn","adventure"],
+"全部":["quánbù","all / entire"],"六关":["liù guān","six levels"],
+"了不起":["liǎobuqǐ","amazing"]
+};
+/* Build a token line from "word|word|！" — words not in D render as punctuation. */
+function L(s){
+  return s.split("|").map(h=>{
+    const d=D[h];
+    return d ? {h,p:d[0],e:d[1]} : {h,punct:true};
+  });
+}
+</script>
+<script>
+/* ============================================================
+   LEVEL DATA
+   node = { bg, sprite, chip?, text:[lines], choices:[...] }
+   choice = { t:line, next, give?, heal?, req?, missing?, danger? }
+   combat node = { combat:{name,sprite,hp,atk}, win, lose, flee }
+   special next targets: "@title", "@level:N", "@restart"
+   ============================================================ */
+const LEVELS = {
+1:{
+  name:"山洞", hsk:1, maxhp:5, start:"c1",
+  nodes:{
+  c1:{bg:"cave",sprite:"doors",
+    text:[L("你好|！|你|在|一个|山洞|里|。"),
+          L("你|看见|三个|门|。")],
+    choices:[
+      {t:L("开|大|门"),next:"c_rat"},
+      {t:L("开|小|门"),next:"c_cat"},
+      {t:L("看看|中间|的|门"),next:"c_fire"}]},
+  c_fire:{bg:"cave",sprite:"firedoor",
+    text:[L("中间|的|门|很|热|！"),L("你|不能|开|。")],
+    choices:[{t:L("好吧|，|我|回去"),next:"c1"}]},
+  c_rat:{bg:"cave",sprite:"rat",
+    text:[L("门|后面|有|一只|大|老鼠|！"),L("它|不|高兴|。")],
+    choices:[
+      {t:L("打|它|！"),next:"fight_rat",danger:true},
+      {t:L("说|“|你好|”"),next:"c_rathello"},
+      {t:L("关门|！|回去|！"),next:"c1"}]},
+  c_rathello:{bg:"cave",sprite:"rat",
+    text:[L("老鼠|不会|说话|。"),L("它|来|打|你|！")],
+    choices:[{t:L("打|它|！"),next:"fight_rat",danger:true}]},
+  fight_rat:{combat:{name:L("大|老鼠"),sprite:"rat",hp:6,atk:[1,1]},
+    win:"c_key",lose:"gameover",flee:"c1"},
+  c_key:{bg:"cave",sprite:"key",
+    text:[L("老鼠|跑|了|！"),
+          L("你|看见|一个|钥匙|。|你|拿|了|钥匙|！")],
+    choices:[{t:L("好|！|我|回去|看看"),next:"hall",give:"钥匙"}]},
+  hall:{bg:"cave",sprite:"backdoor",
+    text:[L("现在|你|有|钥匙|了|。"),
+          L("山洞|后面|有|一个|门|。")],
+    choices:[
+      {t:L("开|后面|的|门"),next:"c_dark",req:"钥匙",missing:"nokey"},
+      {t:L("去|看看|小|门"),next:"c_cat"},
+      {t:L("休息"),next:"resthall",heal:1}]},
+  resthall:{bg:"cave",sprite:"backdoor",
+    text:[L("你|休息|了|。|很|好|！")],
+    choices:[{t:L("好|了|，|走|！"),next:"hall"}]},
+  nokey:{bg:"cave",sprite:"backdoor",
+    text:[L("你|没有|钥匙|！"),L("门|不|开|。")],
+    choices:[{t:L("好吧|，|回去"),next:"c1"}]},
+  c_cat:{bg:"cave",sprite:"cat",chip:"猫",
+    text:[L("你|看见|一只|小|猫|。"),
+          L("猫|说|：|“|你好|！|你|想|要|什么|？|”")],
+    choices:[
+      {t:L("我|想|找|钱|！"),next:"c_hint"},
+      {t:L("你|是|谁|？"),next:"c_who"},
+      {t:L("你|有|吃的|吗|？"),next:"c_fish"},
+      {t:L("再见|！"),next:"c1"}]},
+  c_who:{bg:"cave",sprite:"cat",chip:"猫",
+    text:[L("猫|说|：|“|我|是|山洞|的|猫|。|我|叫|小花|。|”")],
+    choices:[{t:L("你好|，|小花|！"),next:"c_cat"}]},
+  c_hint:{bg:"cave",sprite:"cat",chip:"猫",
+    text:[L("猫|说|：|“|大|门|后面|的|老鼠|有|钥匙|。"),
+          L("有|钥匙|，|你|能|开|后面|的|门|。|”")],
+    choices:[{t:L("谢谢|你|！"),next:"c1"}]},
+  c_fish:{bg:"cave",sprite:"cat",chip:"猫",
+    text:[L("猫|给|你|一条|鱼|。"),
+          L("猫|说|：|“|狗|很|喜欢|鱼|！|”")],
+    choices:[{t:L("谢谢|！"),next:"c_cat",give:"鱼"}]},
+  c_dark:{bg:"dark",sprite:null,
+    text:[L("门|开|了|！|里|很|黑|。"),
+          L("你|听见|狗|的|声音|。")],
+    choices:[
+      {t:L("走|进去"),next:"c_dog",danger:true},
+      {t:L("回去"),next:"hall"}]},
+  c_dog:{bg:"dark",sprite:"dog",
+    text:[L("一只|大|狗|看着|你|！"),
+          L("它|前面|有|很多|钱|。")],
+    choices:[
+      {t:L("给|它|吃的"),next:"c_fed",req:"鱼",missing:"c_nofish"},
+      {t:L("打|它|！"),next:"fight_dog",danger:true},
+      {t:L("慢慢地|回去"),next:"hall"}]},
+  c_nofish:{bg:"dark",sprite:"dog",
+    text:[L("你|没有|吃的|！"),L("狗|很|生气|！")],
+    choices:[{t:L("打|它|！"),next:"fight_dog",danger:true}]},
+  c_fed:{bg:"dark",sprite:"dog",
+    text:[L("你|给|狗|鱼|。|狗|很|高兴|！"),
+          L("你|拿|了|钱|！")],
+    choices:[{t:L("很|好|！|走|！"),next:"c_exit",give:"钱"}]},
+  fight_dog:{combat:{name:L("大|狗"),sprite:"dog",hp:8,atk:[1,2]},
+    win:"c_dogwin",lose:"gameover",flee:"hall"},
+  c_dogwin:{bg:"dark",sprite:"coins",
+    text:[L("狗|跑|了|！"),L("你|拿|了|很多|钱|！")],
+    choices:[{t:L("走|！"),next:"c_exit",give:"钱"}]},
+  c_exit:{bg:"exit",sprite:"sun",
+    text:[L("你|看见|太阳|光|！"),L("你|找到|了|出口|！")],
+    choices:[{t:L("出去|！"),next:"win1"}]},
+  win1:{bg:"outside",sprite:"sun",victory:true,
+    text:[L("你|出去|了|！|你|看见|太阳|和|山|。"),
+          L("你|很|高兴|！"),
+          L("恭喜|！|第一关|完成|了|！")],
+    choices:[
+      {t:L("去|第二关|！"),next:"@level:2"},
+      {t:L("休息|一下"),next:"@title"}]},
+  gameover:{bg:"dark",sprite:null,
+    text:[L("你|太|累|了|……"),L("你|睡觉|了|。")],
+    choices:[
+      {t:L("再|来|！"),next:"@restart"},
+      {t:L("回去|休息"),next:"@title"}]}
+  }
+},
+2:{
+  name:"森林", hsk:2, maxhp:6, start:"f1",
+  nodes:{
+  f1:{bg:"forest",sprite:"trees",
+    text:[L("你|已经|出|了|山洞|，|但是|现在|你|在|一个|大|森林|里|。"),
+          L("天|开始|黑|了|。|你|要|找|路|回家|。")],
+    choices:[
+      {t:L("往|左边|走"),next:"f_left"},
+      {t:L("往|右边|走"),next:"f_right"},
+      {t:L("爬|到|树|上|看看"),next:"f_tree"}]},
+  f_tree:{bg:"forest",sprite:"trees",
+    text:[L("你|从|树|上|看见|："),
+          L("左边|有|水|，|右边|有|火|。|可能|有|人|！")],
+    choices:[{t:L("好|，|我|下来"),next:"f1"}]},
+  f_left:{bg:"river",sprite:"bird",chip:"鸟",
+    text:[L("你|走|到|一条|河|。|水|很|快|，|你|不能|过去|。"),
+          L("一只|鸟|说|：|“|你|为什么|在|这儿|？|”")],
+    choices:[
+      {t:L("我|想|回家|！"),next:"f_birdhelp"},
+      {t:L("你|会|说话|？|！"),next:"f_birdtalk"},
+      {t:L("回去"),next:"f1"}]},
+  f_birdtalk:{bg:"river",sprite:"bird",chip:"鸟",
+    text:[L("鸟|笑|了|：|“|因为|这|是|一个|奇怪|的|森林|！|”")],
+    choices:[{t:L("好吧|……"),next:"f_left"}]},
+  f_birdhelp:{bg:"river",sprite:"bird",chip:"鸟",
+    text:[L("鸟|说|：|“|右边|有|火|。|火|旁边|有|一个|老人|。|他|知道|路|。"),
+          L("但是|小心|！|那|里|有|狼|！|”")],
+    choices:[{t:L("谢谢|你|！"),next:"f1"}]},
+  f_right:{bg:"camp",sprite:"wolf",
+    text:[L("你|看见|火|。|但是|火|旁边|有|一只|大|狼|！"),
+          L("它|的|眼睛|是|红色|的|。")],
+    choices:[
+      {t:L("打|狼|！"),next:"fight_wolf",danger:true},
+      {t:L("慢慢地|走|过去"),next:"f_sneak"},
+      {t:L("跑|回去|！"),next:"f1"}]},
+  f_sneak:{bg:"camp",sprite:"wolf",
+    text:[L("狼|听见|了|你|！|它|很|生气|！")],
+    choices:[{t:L("打|它|！"),next:"fight_wolf",danger:true}]},
+  fight_wolf:{combat:{name:L("大|狼"),sprite:"wolf",hp:10,atk:[1,2]},
+    win:"f_old",lose:"gameover2",flee:"f1"},
+  f_old:{bg:"camp",sprite:"oldman",chip:"老人",
+    text:[L("狼|跑|了|！|火|旁边|有|一个|老人|。"),
+          L("老人|说|：|“|谢谢|你|！|那|只|狼|每天|都|来|。"),
+          L("我|带|你|回家|！|”")],
+    choices:[
+      {t:L("太|好|了|！"),next:"win2"},
+      {t:L("你|为什么|在|森林|里|？"),next:"f_why"}]},
+  f_why:{bg:"camp",sprite:"oldman",chip:"老人",
+    text:[L("老人|说|：|“|因为|我|喜欢|安静|。|”")],
+    choices:[{t:L("好吧|！|我们|走|！"),next:"win2"}]},
+  win2:{bg:"outside",sprite:"house",victory:true,
+    text:[L("你|跟|老人|走|了|很|长|时间|。"),
+          L("最后|，|你|看见|你|的|家|！|你|很|累|，|但是|你|非常|高兴|。"),
+          L("恭喜|！|第二关|完成|了|！")],
+    choices:[
+      {t:L("去|第三关|！"),next:"@level:3"},
+      {t:L("休息|一下"),next:"@title"}]},
+  gameover2:{bg:"forest",sprite:null,
+    text:[L("你|太|累|了|……|你|睡觉|了|。")],
+    choices:[
+      {t:L("再|来|！"),next:"@restart"},
+      {t:L("回去|休息"),next:"@title"}]}
+  }
+},
+3:{
+  name:"小城", hsk:3, maxhp:7, start:"t1",
+  nodes:{
+  t1:{bg:"home",sprite:null,
+    text:[L("早上|，|你|在|家|里|。|突然|，|你|发现|你|的|钱|不见了|！"),
+          L("门|开|着|，|地上|有|脚印|。")],
+    choices:[
+      {t:L("跟着|脚印|走|！"),next:"t2"},
+      {t:L("先|吃|早饭"),next:"t_break",heal:1},
+      {t:L("问|邻居"),next:"t_neighbor"}]},
+  t_break:{bg:"home",sprite:null,
+    text:[L("你|吃|了|早饭|。|现在|你|觉得|好多了|！")],
+    choices:[{t:L("好|！|走|！"),next:"t1"}]},
+  t_neighbor:{bg:"home",sprite:null,chip:"邻居",
+    text:[L("邻居|说|：|“|昨天|晚上|我|听见|了|奇怪|的|声音|。"),
+          L("有人|往|城里|跑|了|！|”")],
+    choices:[{t:L("谢谢|！"),next:"t1"}]},
+  t2:{bg:"town",sprite:null,
+    text:[L("脚印|带|你|到|了|小城|。|街上|人|很多|。"),
+          L("你|可以|去|三个|地方|。")],
+    choices:[
+      {t:L("去|商店"),next:"t_shop"},
+      {t:L("去|图书馆"),next:"t_lib"},
+      {t:L("去|公园"),next:"t_park"}]},
+  t_shop:{bg:"town",sprite:null,chip:"商店的人",
+    text:[L("商店|的|人|说|：|“|今天|早上|有|一个|男人|来|买|东西|。"),
+          L("他|看起来|很|害怕|，|往|公园|那边|去|了|。|”")],
+    choices:[{t:L("谢谢|你|！"),next:"t2"}]},
+  t_lib:{bg:"town",sprite:"book",chip:"女孩",
+    text:[L("图书馆|很|安静|。|一个|女孩|在|看书|。"),
+          L("她|说|：|“|我|看见|一个|男人|拿|着|大|包|去|公园|了|。|”")],
+    choices:[{t:L("谢谢|！"),next:"t2"}]},
+  t_park:{bg:"park",sprite:"man",
+    text:[L("公园|里|有|很多|树|。"),
+          L("一个|男人|在|树|下|睡觉|。|他|旁边|有|一个|包|。")],
+    choices:[
+      {t:L("再|看看"),next:"t_look"},
+      {t:L("叫|他|起来|！"),next:"t_chase",danger:true},
+      {t:L("慢慢地|拿|包"),next:"t_sneak"}]},
+  t_look:{bg:"park",sprite:"man",
+    text:[L("你|发现|包|上|有|你|的|名字|！"),
+          L("这|是|你|的|包|！")],
+    choices:[
+      {t:L("叫|他|起来|！"),next:"t_chase",danger:true},
+      {t:L("慢慢地|拿|包"),next:"t_sneak"}]},
+  t_sneak:{bg:"park",sprite:"man",
+    text:[L("你|慢慢地|拿|包|。|但是|男人|醒|了|！"),
+          L("他|站|起来|就|跑|！")],
+    choices:[{t:L("跟着|他|！"),next:"t_roof"}]},
+  t_chase:{bg:"town",sprite:null,
+    text:[L("男人|站|起来|就|跑|！|他|跑|到|一个|老|楼|，|爬|到|楼上|。"),
+          L("你|也|爬|上去|。")],
+    choices:[{t:L("走|！"),next:"t_roof"}]},
+  t_roof:{bg:"roof",sprite:"man",
+    text:[L("楼上|，|月亮|很|大|。|男人|站|在|你|前面|。"),
+          L("他|看起来|很|害怕|。")],
+    choices:[
+      {t:L("把|我|的|钱|给|我|！"),next:"fight_thief",danger:true},
+      {t:L("你|为什么|拿|我|的|钱|？"),next:"t_why"}]},
+  t_why:{bg:"roof",sprite:"man",chip:"男人",
+    text:[L("男人|说|：|“|对不起|……"),
+          L("因为|我|的|孩子|病|了|，|我|需要|钱|。|”")],
+    choices:[
+      {t:L("我|相信|你|。|我|帮助|你|！"),next:"t_help"},
+      {t:L("我|不|相信|你|！"),next:"fight_thief",danger:true}]},
+  t_help:{bg:"roof",sprite:"man",chip:"男人",
+    text:[L("你|给|了|他|一点|钱|。|男人|哭|了|。"),
+          L("他|把|钱|还给|你|：|“|谢谢|你|！|我们|是|朋友|！|”")],
+    choices:[{t:L("太|好|了|！"),next:"win3g"}]},
+  fight_thief:{combat:{name:L("小偷"),sprite:"man",hp:10,atk:[1,2]},
+    win:"t_fwin",lose:"gameover3",flee:"t_park"},
+  t_fwin:{bg:"roof",sprite:"coins",
+    text:[L("男人|跑|了|。|你|拿回|了|你|的|钱|。"),
+          L("但是|你|觉得|有点|难过|。")],
+    choices:[{t:L("回家|。"),next:"win3"}]},
+  win3:{bg:"outside",sprite:"house",victory:true,
+    text:[L("你|回家|了|。"),
+          L("恭喜|！|第三关|完成|了|！")],
+    choices:[
+      {t:L("去|第四关|！"),next:"@level:4"},
+      {t:L("休息|一下"),next:"@title"}]},
+  win3g:{bg:"outside",sprite:"house",victory:true,
+    text:[L("你们|一起|回|了|小城|。|你|有|了|一个|新|朋友|！"),
+          L("恭喜|！|第三关|完成|了|！")],
+    choices:[
+      {t:L("去|第四关|！"),next:"@level:4"},
+      {t:L("休息|一下"),next:"@title"}]},
+  gameover3:{bg:"roof",sprite:null,
+    text:[L("你|太|累|了|……|你|睡觉|了|。")],
+    choices:[
+      {t:L("再|来|！"),next:"@restart"},
+      {t:L("回去|休息"),next:"@title"}]}
+  }
+}
+,
+4:{
+  name:"小岛", hsk:4, maxhp:8, start:"d1",
+  nodes:{
+  d1:{bg:"home",sprite:"doctor",chip:"医生",
+    text:[L("冬天|快|到|了|。|城里|很多|孩子|病|了|。"),
+          L("医生|说|：|“|只有|海上|小岛|上|的|一种|蓝色|的|花|能|做|药|。"),
+          L("但是|海上|很|危险|，|没有|人|愿意|去|。|”")],
+    choices:[
+      {t:L("我|愿意|去|！"),next:"d2"},
+      {t:L("为什么|危险|？"),next:"d1b"}]},
+  d1b:{bg:"home",sprite:"doctor",chip:"医生",
+    text:[L("医生|说|：|“|最近|天气|不|好|，|海上|常常|刮|大风|。"),
+          L("而且|，|听说|岛|上|有|一条|大|蛇|。|”")],
+    choices:[{t:L("我|不|怕|！|我|去|！"),next:"d2"}]},
+  d2:{bg:"harbor",sprite:"captain",chip:"船长",
+    text:[L("你|到|了|海边|。|一个|船长|站|在|船|旁边|。"),
+          L("船长|说|：|“|你|真的|要|去|小岛|？|好吧|，|上|船|！|”")],
+    choices:[
+      {t:L("上|船|！"),next:"d3"},
+      {t:L("你|去|过|小岛|吗|？"),next:"d2b"}]},
+  d2b:{bg:"harbor",sprite:"captain",chip:"船长",
+    text:[L("船长|说|：|“|去|过|一次|。|我|把|你|送|到|岛|边|，|但是|我|不|上|岛|。"),
+          L("那|条|蛇|太|可怕|了|！|”")],
+    choices:[{t:L("好|，|走|吧|！"),next:"d3"}]},
+  d3:{bg:"sea",sprite:null,
+    text:[L("船|开|了|。|开始|天气|很|好|。"),
+          L("但是|过|了|一会儿|，|天|变|黑|了|，|开始|刮|大风|，|下大雨|！")],
+    choices:[
+      {t:L("帮|船长|开|船|！"),next:"d3a",heal:1},
+      {t:L("到|船|里面|去"),next:"d3b"}]},
+  d3a:{bg:"sea",sprite:"captain",chip:"船长",
+    text:[L("你|和|船长|一起|努力|。|虽然|很|累|，|但是|船|安全|地|经过|了|大风|大雨|。"),
+          L("船长|说|：|“|谢谢|你|！|你|真|勇敢|！|”")],
+    choices:[{t:L("我们|到|了|吗|？"),next:"d4"}]},
+  d3b:{bg:"sea",sprite:null,
+    text:[L("你|到|船|里面|去|了|。|船|上上下下|，|你|觉得|很|难受|。"),
+          L("最后|，|大风|过去|了|。")],
+    choices:[{t:L("我们|到|了|吗|？"),next:"d4"}]},
+  d4:{bg:"beach",sprite:null,
+    text:[L("你|到|了|小岛|。|岛|上|很|安静|，|只有|鸟|的|声音|。"),
+          L("你|看见|山|下|有|一个|洞|。")],
+    choices:[
+      {t:L("走|进|洞|里"),next:"d5"},
+      {t:L("先|在|岛|上|找找|花"),next:"d4b"}]},
+  d4b:{bg:"beach",sprite:null,
+    text:[L("你|找|了|很|长|时间|，|但是|没有|找到|蓝色|的|花|。"),
+          L("可能|花|在|洞|里|。")],
+    choices:[{t:L("好吧|，|进|洞|！"),next:"d5"}]},
+  d5:{bg:"dark",sprite:null,
+    text:[L("洞|里|很|黑|。|你|听见|奇怪|的|声音|……"),
+          L("前面|有|光|！")],
+    choices:[
+      {t:L("慢慢地|往|前|走"),next:"d6"},
+      {t:L("大声|说|：|“|有人|吗|？|”"),next:"d5b",danger:true}]},
+  d5b:{bg:"dark",sprite:"snake",
+    text:[L("你|的|声音|把|大|蛇|叫|醒|了|！|大|蛇|很|生气|！")],
+    choices:[{t:L("打|它|！"),next:"fight_snake",danger:true}]},
+  d6:{bg:"dark",sprite:"snake",
+    text:[L("你|看见|了|！|一条|大|蛇|睡|在|一朵|蓝色|的|花|旁边|。")],
+    choices:[
+      {t:L("跟|蛇|说话"),next:"d7"},
+      {t:L("慢慢地|拿|花"),next:"d6b"},
+      {t:L("打|蛇|！"),next:"fight_snake",danger:true}]},
+  d6b:{bg:"dark",sprite:"snake",
+    text:[L("你|拿|花|的|时候|，|蛇|醒|了|！|它|非常|生气|！")],
+    choices:[{t:L("打|它|！"),next:"fight_snake",danger:true}]},
+  d7:{bg:"dark",sprite:"snake",chip:"蛇",
+    text:[L("蛇|醒|了|。|它|说|：|“|又|是|来|拿|花|的|人|！"),
+          L("你们|来|了|就|拿|，|从来|不|问|！|”")],
+    choices:[
+      {t:L("对不起|。|我|可以|问|你|吗|？"),next:"d8"},
+      {t:L("别|说话|！"),next:"fight_snake",danger:true}]},
+  d8:{bg:"dark",sprite:"snake",chip:"蛇",
+    text:[L("蛇|说|：|“|这种|花|一百|年|才|开|一次|。|孩子们|病|了|，|我|也|很|难过|。"),
+          L("但是|把|花|拿走|，|花|就|死|了|。|”")],
+    choices:[{t:L("那|怎么办|？"),next:"d9"}]},
+  d9:{bg:"dark",sprite:"snake",chip:"蛇",
+    text:[L("蛇|说|：|“|花|的|种子|也|可以|做|药|。|我|把|种子|给|你|。"),
+          L("这样|，|花|不|会|死|，|孩子们|也|能|好|起来|。|”")],
+    choices:[{t:L("谢谢|你|！|你|真|好|！"),next:"d10g",give:"种子"}]},
+  d10g:{bg:"sea",sprite:"captain",chip:"船长",
+    text:[L("船长|看见|你|回来|，|非常|高兴|！|你们|一起|回家|。")],
+    choices:[{t:L("走|！"),next:"win4g"}]},
+  fight_snake:{combat:{name:L("大|蛇"),sprite:"snake",hp:14,atk:[1,3]},
+    win:"d10f",lose:"gameover4",flee:"d5"},
+  d10f:{bg:"dark",sprite:"flower",
+    text:[L("蛇|跑|了|。|你|拿|了|蓝色|的|花|。"),
+          L("但是|你|想|：|这里|以后|不|会|再|有|这种|花|了|……")],
+    choices:[{t:L("回|船|上"),next:"d10f2",give:"花"}]},
+  d10f2:{bg:"sea",sprite:"captain",chip:"船长",
+    text:[L("船长|看见|你|回来|，|非常|高兴|！|你们|一起|回家|。")],
+    choices:[{t:L("走|！"),next:"win4f"}]},
+  win4g:{bg:"outside",sprite:"flower",victory:true,
+    text:[L("医生|用|种子|做|了|药|，|还|种|出|了|新|的|花|。|孩子们|都|好|了|！"),
+          L("大家|都|感谢|你|。|恭喜|！|第四关|完成|了|！")],
+    choices:[
+      {t:L("去|第五关|！"),next:"@level:5"},
+      {t:L("休息|一下"),next:"@title"}]},
+  win4f:{bg:"outside",sprite:"flower",victory:true,
+    text:[L("医生|用|花|做|了|药|。|孩子们|都|好|了|！"),
+          L("恭喜|！|第四关|完成|了|！")],
+    choices:[
+      {t:L("去|第五关|！"),next:"@level:5"},
+      {t:L("休息|一下"),next:"@title"}]},
+  gameover4:{bg:"dark",sprite:null,
+    text:[L("你|太|累|了|……|你|睡觉|了|。")],
+    choices:[
+      {t:L("再|来|！"),next:"@restart"},
+      {t:L("回去|休息"),next:"@title"}]}
+  }
+},
+5:{
+  name:"雪山", hsk:5, maxhp:9, start:"v1",
+  nodes:{
+  v1:{bg:"village",sprite:"oldman",chip:"村长",
+    text:[L("春天|，|你|收到|一封|信|，|是|山|里|的|村子|写|的|。"),
+          L("村长|说|：|“|最近|，|雪山|上|每天|晚上|都|有|可怕|的|声音|，|还有|巨大|的|影子|。"),
+          L("大家|都|很|害怕|。|请|你|帮助|我们|！|”")],
+    choices:[
+      {t:L("我|马上|上山|！"),next:"v4",req:"衣服",missing:"v_freeze"},
+      {t:L("先|问问|村里|的|人"),next:"v2"},
+      {t:L("先|准备|一下"),next:"v3"}]},
+  v2:{bg:"village",sprite:null,chip:"孩子",
+    text:[L("村里|的|孩子|说|：|“|我|不|怕|！"),
+          L("我|觉得|那个|声音|听|起来|很|难过|，|不|可怕|。|”")],
+    choices:[{t:L("有|意思|……"),next:"v1"}]},
+  v3:{bg:"village",sprite:"oldman",chip:"村长",
+    text:[L("村长|给|你|一件|很|厚|的|衣服|：|“|山|上|非常|冷|，|你|一定|要|穿|上|！|”")],
+    choices:[{t:L("谢谢|！"),next:"v1",give:"衣服"}]},
+  v_freeze:{bg:"snowmtn",sprite:null,
+    text:[L("山|上|太|冷|了|！|风|像|刀子|一样|！"),
+          L("你|不得不|回到|村子|。")],
+    choices:[{t:L("我|需要|厚|衣服|……"),next:"v1"}]},
+  v4:{bg:"snowmtn",sprite:null,
+    text:[L("你|穿|着|厚|衣服|，|慢慢地|往|上|爬|。"),
+          L("在|雪|里|，|你|发现|了|一个|巨大|的|山洞|。|声音|就|是|从|这里|传|出来|的|！")],
+    choices:[{t:L("走|进去"),next:"v5"}]},
+  v5:{bg:"snowcave",sprite:"yeti",
+    text:[L("一只|巨大|的|雪怪|坐|在|洞|里|，|正在|哭|！"),
+          L("它|的|脚|下|有|一个|小小的|东西|。")],
+    choices:[
+      {t:L("问|它|为什么|哭"),next:"v6"},
+      {t:L("看看|那个|小小的|东西"),next:"v5b"},
+      {t:L("打|怪物|！"),next:"fight_yeti",danger:true}]},
+  v5b:{bg:"snowcave",sprite:"bird",
+    text:[L("那|是|一只|小鸟|！|它|的|翅膀|受伤|了|。"),
+          L("雪怪|是|在|为|小鸟|难过|吗|？")],
+    choices:[
+      {t:L("问|雪怪"),next:"v6"},
+      {t:L("打|怪物|！"),next:"fight_yeti",danger:true}]},
+  v6:{bg:"snowcave",sprite:"yeti",chip:"雪怪",
+    text:[L("雪怪|说|：|“|别人|一|看见|我|就|打|我|……|其实|我|从来|没有|伤害|过|谁|。"),
+          L("这|只|小鸟|从|山|上|掉|下来|，|受伤|了|。|我|不|知道|怎么|帮|它|。|”")],
+    choices:[
+      {t:L("我|来|帮|小鸟|！"),next:"v7"},
+      {t:L("我|不|相信|你|！"),next:"fight_yeti",danger:true}]},
+  v7:{bg:"snowcave",sprite:"bird",
+    text:[L("你|小心|地|把|小鸟|放|在|温暖|的|衣服|里|。"),
+          L("几|天|以后|，|小鸟|好|了|！|雪怪|非常|高兴|，|它|送|你|和|小鸟|下山|。")],
+    choices:[{t:L("我们|一起|回|村子|！"),next:"win5g"}]},
+  win5g:{bg:"village",sprite:"yeti",victory:true,
+    text:[L("村民|看见|雪怪|帮助|你|，|都|不|害怕|了|。"),
+          L("从|那|以后|，|村子|和|雪怪|成|了|朋友|。"),
+          L("恭喜|！|第五关|完成|了|！")],
+    choices:[
+      {t:L("去|第六关|！"),next:"@level:6"},
+      {t:L("休息|一下"),next:"@title"}]},
+  fight_yeti:{combat:{name:L("雪怪"),sprite:"yeti",hp:14,atk:[1,3]},
+    win:"v_fwin",lose:"gameover5",flee:"v4"},
+  v_fwin:{bg:"snowcave",sprite:"bird",
+    text:[L("雪怪|跑|到|山|的|深处|去|了|。|晚上|再|也|没有|声音|了|。"),
+          L("但是|你|永远|不|知道|：|它|到底|是|不是|坏人|……"),
+          L("你|把|受伤|的|小鸟|带|回|了|村子|。")],
+    choices:[{t:L("回|村子"),next:"win5f"}]},
+  win5f:{bg:"village",sprite:null,victory:true,
+    text:[L("村子|安静|了|。|但是|你|常常|想起|山洞|里|哭|的|声音|。"),
+          L("恭喜|！|第五关|完成|了|！")],
+    choices:[
+      {t:L("去|第六关|！"),next:"@level:6"},
+      {t:L("休息|一下"),next:"@title"}]},
+  gameover5:{bg:"snowcave",sprite:null,
+    text:[L("你|太|累|了|……|你|睡觉|了|。")],
+    choices:[
+      {t:L("再|来|！"),next:"@restart"},
+      {t:L("回去|休息"),next:"@title"}]}
+  }
+},
+6:{
+  name:"古庙", hsk:6, maxhp:10, start:"g1",
+  nodes:{
+  g1:{bg:"temple",sprite:null,
+    text:[L("很多|年|过去|了|。|现在|，|你|已经|是|一位|有名|的|冒险者|了|。"),
+          L("传说|，|最|高|的|山顶|上|有|一座|古庙|，|庙|里|有|世界|上|最|大|的|宝藏|。"),
+          L("今天|，|你|终于|站|在|了|古庙|的|门|前|。")],
+    choices:[{t:L("开|门|！"),next:"g2"}]},
+  g2:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("门|前|站|着|一个|巨大|的|石人|！|它|的|眼睛|亮|了|起来|。"),
+          L("石人|说|：|“|想|进|庙|，|先|回答|我|三个|问题|。"),
+          L("答|错|了|，|就|跟|我|打|！|”")],
+    choices:[
+      {t:L("好|！|你|问|吧|！"),next:"r1"},
+      {t:L("我|不|回答|！|打|吧|！"),next:"fight_golem",danger:true}]},
+  r1:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("第一个|问题|：|什么|东西|越|洗|越|脏|？")],
+    choices:[
+      {t:L("衣服"),next:"r1w"},
+      {t:L("水"),next:"r2"},
+      {t:L("手"),next:"r1w"}]},
+  r1w:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("石人|说|：|“|错|了|！|再|想想|。|”")],
+    choices:[
+      {t:L("再|来|一次"),next:"r1"},
+      {t:L("别|问|了|！|打|吧|！"),next:"fight_golem",danger:true}]},
+  r2:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("对|了|！|第二个|问题|：|什么|东西|白天|看|不|见|，|晚上|才|出来|？")],
+    choices:[
+      {t:L("太阳"),next:"r2w"},
+      {t:L("鸟"),next:"r2w"},
+      {t:L("星星"),next:"r3"}]},
+  r2w:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("石人|说|：|“|错|了|！|再|想想|。|”")],
+    choices:[
+      {t:L("再|来|一次"),next:"r2"},
+      {t:L("别|问|了|！|打|吧|！"),next:"fight_golem",danger:true}]},
+  r3:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("对|了|！|最后|一个|问题|：|什么|东西|是|你|的|，|但是|别人|用|得|比|你|多|？")],
+    choices:[
+      {t:L("你|的|钱"),next:"r3w"},
+      {t:L("你|的|名字"),next:"g3"},
+      {t:L("你|的|家"),next:"r3w"}]},
+  r3w:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("石人|说|：|“|错|了|！|再|想想|。|”")],
+    choices:[
+      {t:L("再|来|一次"),next:"r3"},
+      {t:L("别|问|了|！|打|吧|！"),next:"fight_golem",danger:true}]},
+  g3:{bg:"temple",sprite:"golem",chip:"石人",
+    text:[L("石人|笑|了|：|“|你|很|有|智慧|！|请|进|吧|。|”"),
+          L("庙|门|慢慢地|开|了|。")],
+    choices:[{t:L("走|进去"),next:"g4"}]},
+  fight_golem:{combat:{name:L("石人"),sprite:"golem",hp:16,atk:[2,3]},
+    win:"g3f",lose:"gameover6",flee:"g2"},
+  g3f:{bg:"temple",sprite:null,
+    text:[L("石人|倒|了|。|庙|门|开|了|。")],
+    choices:[{t:L("走|进去"),next:"g4"}]},
+  g4:{bg:"shrine",sprite:null,
+    text:[L("庙|里|没有|金子|，|也|没有|宝石|。"),
+          L("只有|一面|古老|的|镜子|和|一块|石碑|。"),
+          L("石碑|上|写|着|：|“|真正|的|宝藏|不|在|庙|里|。|”")],
+    choices:[{t:L("看|镜子"),next:"g5"}]},
+  g5:{bg:"shrine",sprite:null,
+    text:[L("镜子|里|，|你|看见|了|自己|——|还有|这|一路|上|你|见|过|的|朋友们|："),
+          L("山洞|里|的|猫|、|森林|里|的|老人|、|小城|里|的|男人|、|海上|的|船长|、|雪山|上|的|雪怪|……")],
+    choices:[{t:L("我|明白|了|。"),next:"win6"}]},
+  win6:{bg:"shrine",sprite:"sun",victory:true,
+    text:[L("真正|的|宝藏|，|是|你|一路|上|帮助|过|的|人|，|和|你|学|到|的|东西|。"),
+          L("恭喜|你|！|你|完成|了|汉字|冒险|的|全部|六关|！"),
+          L("你|已经|从|第一关|走|到|了|第六关|！|你|真|了不起|！")],
+    choices:[{t:L("太|好|了|！"),next:"@title"}]},
+  gameover6:{bg:"temple",sprite:null,
+    text:[L("你|太|累|了|……|你|睡觉|了|。")],
+    choices:[
+      {t:L("再|来|！"),next:"@restart"},
+      {t:L("回去|休息"),next:"@title"}]}
+  }
+}
+};
+/* combat vocabulary (shared) */
+const CT = {
+  attack:L("打|它|！"), rest:L("休息"), flee:L("跑|！"),
+  youHit:L("你|打|了|它|！"), itHit:L("它|打|了|你|！"),
+  youRest:L("你|休息|了|。"), itRan:L("它|跑|了|！"),
+  youRan:L("你|跑|了|！")
+};
+</script>
+<script>
+/* ============================================================
+   ENGINE — state, save/load, rendering, combat
+   ============================================================ */
+const $ = s=>document.querySelector(s);
+const stage=$("#stage"), hudlvl=$("#hudlvl"), heartsEl=$("#hearts"),
+      badge=$("#lvlbadge"), tip=$("#tip"), toast=$("#toast");
+
+let S = null;            // game state (null = on title screen)
+let unlocked = [1];      // unlocked levels
+let memStore = {};       // fallback if localStorage is blocked
+
+function store(){ try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return localStorage; }catch(e){ return null; } }
+function persist(key,val){ const st=store(); if(st) st.setItem(key,val); else memStore[key]=val; return !!st; }
+function recall(key){ const st=store(); return st ? st.getItem(key) : (memStore[key]??null); }
+function wipe(){ const st=store(); if(st){st.removeItem("hq_save");st.removeItem("hq_unlocked");} memStore={}; }
+
+function showToast(msg){ toast.textContent=msg; toast.classList.add("show");
+  clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove("show"),1600); }
+
+function loadUnlocked(){ try{ const u=JSON.parse(recall("hq_unlocked")); if(Array.isArray(u)&&u.length) unlocked=u; }catch(e){} }
+function saveUnlocked(){ persist("hq_unlocked",JSON.stringify(unlocked)); }
+
+function saveGame(silent){
+  if(!S){ showToast("没有游戏 · nothing to save"); return; }
+  const ok = persist("hq_save",JSON.stringify(S));
+  if(!silent) showToast(ok?"已保存 · saved!":"已保存（仅本次）· saved (this session only)");
+}
+function loadGame(){ try{ const s=JSON.parse(recall("hq_save")); return (s&&LEVELS[s.level]&&LEVELS[s.level].nodes[s.node])?s:null; }catch(e){ return null; } }
+
+/* ---------------- speech ---------------- */
+let zhVoice=null;
+function pickVoice(){
+  const vs=speechSynthesis.getVoices();
+  zhVoice = vs.find(v=>/^zh([-_]CN)?/i.test(v.lang)&&/google/i.test(v.name))
+         || vs.find(v=>/^zh/i.test(v.lang)) || null;
+}
+if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+let speakingBtn=null;
+function stopSpeech(){
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+  if(speakingBtn){ speakingBtn.classList.remove("on"); speakingBtn=null; }
+}
+function speak(text,rate){
+  if(!("speechSynthesis" in window)){ showToast("no speech voices found"); return; }
+  stopSpeech();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="zh-CN"; if(zhVoice)u.voice=zhVoice; u.rate=rate||0.85;
+  speechSynthesis.speak(u);
+}
+/* 🔊 buttons toggle: press once to play, press again to stop mid-sentence */
+function toggleSpeak(btn,text){
+  if(!("speechSynthesis" in window)){ showToast("no speech voices found"); return; }
+  if(speakingBtn===btn){ stopSpeech(); return; }
+  stopSpeech();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="zh-CN"; if(zhVoice)u.voice=zhVoice; u.rate=0.85;
+  speakingBtn=btn; btn.classList.add("on");
+  u.onend=u.onerror=()=>{ if(speakingBtn===btn){ btn.classList.remove("on"); speakingBtn=null; } };
+  speechSynthesis.speak(u);
+}
+const lineToText = line => line.map(t=>t.h).join("");
+
+/* ---------------- tooltip ---------------- */
+function tipShow(el,tok){
+  tip.querySelector(".th").textContent=tok.h;
+  tip.querySelector(".tp").textContent=tok.p;
+  tip.querySelector(".te").textContent=tok.e;
+  tip.style.display="block";
+  const r=el.getBoundingClientRect(), tw=tip.offsetWidth;
+  let x=r.left+r.width/2-tw/2;
+  x=Math.max(8,Math.min(x,innerWidth-tw-8));
+  let y=r.top-tip.offsetHeight-8;
+  if(y<8) y=r.bottom+8;
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+}
+function tipHide(){ tip.style.display="none"; }
+
+/* ---------------- word / line rendering ---------------- */
+function renderLine(line,{speakOnClick=true}={}){
+  const span=document.createElement("span");
+  line.forEach(tok=>{
+    if(tok.punct){
+      const p=document.createElement("span");
+      p.className="punct"; p.textContent=tok.h; span.appendChild(p); return;
+    }
+    const w=document.createElement("span"); w.className="w";
+    const ruby=document.createElement("ruby");
+    ruby.appendChild(document.createTextNode(tok.h));
+    const rt=document.createElement("rt"); rt.textContent=tok.p; ruby.appendChild(rt);
+    w.appendChild(ruby);
+    w.addEventListener("mouseenter",()=>tipShow(w,tok));
+    w.addEventListener("mouseleave",tipHide);
+    if(speakOnClick) w.addEventListener("click",e=>{e.stopPropagation(); tipShow(w,tok); speak(tok.h,0.8);});
+    span.appendChild(w);
+  });
+  return span;
+}
+function makeBubble(lines,chip){
+  const b=document.createElement("div"); b.className="bubble";
+  if(chip){ const c=document.createElement("span"); c.className="chip"; c.textContent=chip; b.appendChild(c); }
+  lines.forEach((line,i)=>{
+    b.appendChild(renderLine(line));
+    if(i<lines.length-1) b.appendChild(document.createElement("br"));
+  });
+  const helpers=document.createElement("div"); helpers.className="helpers";
+  const py=document.createElement("button"); py.className="mini"; py.textContent="拼";
+  py.title="Toggle pinyin";
+  py.onclick=()=>{ b.classList.toggle("show-py"); py.classList.toggle("on"); };
+  const au=document.createElement("button"); au.className="mini"; au.textContent="🔊";
+  au.title="Listen (press again to stop)";
+  au.onclick=()=>toggleSpeak(au,lines.map(lineToText).join("，"));
+  helpers.append(py,au); b.appendChild(helpers);
+  return b;
+}
+function makeChoice(ch,onPick){
+  const btn=document.createElement("button");
+  btn.className="choice"+(ch.danger?" danger":"");
+  btn.appendChild(renderLine(ch.t,{speakOnClick:false}));
+  const helpers=document.createElement("div"); helpers.className="helpers";
+  const py=document.createElement("button"); py.className="mini"; py.textContent="拼";
+  py.onclick=e=>{e.stopPropagation(); btn.classList.toggle("show-py"); py.classList.toggle("on");};
+  const au=document.createElement("button"); au.className="mini"; au.textContent="🔊";
+  au.onclick=e=>{e.stopPropagation(); toggleSpeak(au,lineToText(ch.t));};
+  helpers.append(py,au); btn.appendChild(helpers);
+  btn.style.paddingRight="78px";
+  btn.addEventListener("click",()=>{tipHide(); onPick(ch);});
+  return btn;
+}
+
+/* ---------------- HUD ---------------- */
+function drawHUD(){
+  if(!S){ hudlvl.textContent=""; heartsEl.textContent=""; badge.textContent=""; return; }
+  const lv=LEVELS[S.level];
+  hudlvl.textContent=`LV${S.level} · HSK${lv.hsk}`;
+  heartsEl.textContent="♥".repeat(S.hp)+"·".repeat(Math.max(0,lv.maxhp-S.hp));
+  badge.textContent=`第${["一","二","三","四","五","六"][S.level-1]}关 · ${lv.name}`;
+  const inv=S.items.length?("  ["+S.items.join(" · ")+"]"):"";
+  hudlvl.textContent+=inv;
+}
+
+/* ---------------- scenes ---------------- */
+function goNode(id){
+  if(id==="@title") return showTitle();
+  if(id==="@restart"){ startLevel(S.level); return; }
+  if(id.startsWith("@level:")){ startLevel(parseInt(id.slice(7),10)); return; }
+  S.node=id;
+  const lv=LEVELS[S.level], node=lv.nodes[id];
+  if(node.combat) return enterCombat(node);
+  if(node.victory && !unlocked.includes(S.level+1) && LEVELS[S.level+1]){
+    unlocked.push(S.level+1); saveUnlocked(); saveGame(true);
+    showToast("第"+["一","二","三","四","五","六"][S.level]+"关 unlocked! (auto-saved)");
+  }
+  setScene(node.bg,node.sprite);
+  stage.innerHTML="";
+  stage.appendChild(makeBubble(node.text,node.chip));
+  const box=document.createElement("div"); box.id="choices";
+  node.choices.forEach(ch=>box.appendChild(makeChoice(ch,pick)));
+  stage.appendChild(box);
+  drawHUD();
+}
+function pick(ch){
+  if(ch.req && !S.items.includes(ch.req)) return goNode(ch.missing);
+  if(ch.give && !S.items.includes(ch.give)) S.items.push(ch.give);
+  if(ch.heal) S.hp=Math.min(LEVELS[S.level].maxhp,S.hp+ch.heal);
+  goNode(ch.next);
+}
+
+/* ---------------- combat ---------------- */
+let C=null; // combat state
+function enterCombat(node){
+  C={node,ehp:node.combat.hp,busy:false};
+  const keep=(scene.bg && scene.bg!=="title") ? scene.bg : "battle";
+  setScene(keep,node.combat.sprite);
+  renderCombat([]);
+}
+function heartsStr(n,max){ return "♥".repeat(Math.max(0,n))+"·".repeat(Math.max(0,max-n)); }
+function renderCombat(log){
+  const cb=C.node.combat, lv=LEVELS[S.level];
+  stage.innerHTML="";
+  const row1=document.createElement("div"); row1.className="hprow";
+  row1.innerHTML=""; const nm=document.createElement("span");
+  nm.appendChild(renderLine(cb.name)); nm.style.fontFamily="var(--cjk)"; nm.style.fontSize="18px";
+  const hh=document.createElement("span"); hh.className="hh"; hh.textContent=heartsStr(C.ehp,cb.hp);
+  row1.append(nm,hh); stage.appendChild(row1);
+  const row2=document.createElement("div"); row2.className="hprow";
+  row2.innerHTML=`<span>你 YOU</span><span class="hh">${heartsStr(S.hp,lv.maxhp)}</span>`;
+  stage.appendChild(row2);
+  log.forEach(entry=>stage.appendChild(makeBubble([entry.line])));
+  if(C.ehp<=0){ finishCombat("win"); return; }
+  if(S.hp<=0){ finishCombat("lose"); return; }
+  const box=document.createElement("div"); box.id="choices";
+  box.appendChild(makeChoice({t:CT.attack,danger:true},()=>turn("attack")));
+  box.appendChild(makeChoice({t:CT.rest},()=>turn("rest")));
+  box.appendChild(makeChoice({t:CT.flee},()=>turn("flee")));
+  stage.appendChild(box);
+  drawHUD();
+}
+function rnd(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function turn(action){
+  if(C.busy) return; C.busy=true;
+  const cb=C.node.combat, lv=LEVELS[S.level], log=[];
+  /* the hero grows: stronger hits and better rests at higher HSK levels */
+  const pAtk = ()=>rnd(2,3)+Math.floor((S.level-1)/3);
+  const pRest = 1+Math.floor(S.level/2);
+  if(action==="attack"){ C.ehp-=pAtk(); log.push({line:CT.youHit}); fx.hitEnemy(); }
+  if(action==="rest"){ S.hp=Math.min(lv.maxhp,S.hp+pRest); log.push({line:CT.youRest}); }
+  if(action==="flee"){ const target=C.node.flee; log.push({line:CT.youRan});
+    renderCombat(log);
+    setTimeout(()=>{C=null; goNode(target);},700); return; }
+  if(C.ehp>0){
+    S.hp-=rnd(cb.atk[0],cb.atk[1]); log.push({line:CT.itHit}); fx.hitPlayer();
+  } else log.push({line:CT.itRan});
+  renderCombat(log); C.busy=false;
+}
+function C0targ(kind){ return C.node[kind]; }
+function finishCombat(result){
+  const target=C.node[result]; C=null;
+  setTimeout(()=>goNode(target),650);
+  drawHUD();
+}
+
+/* ---------------- title & menus ---------------- */
+function menuBtn(zh,en,fn,disabled){
+  const b=document.createElement("button"); b.className="menubtn";
+  b.innerHTML=zh+"<small>"+en+"</small>"; b.disabled=!!disabled;
+  if(fn) b.onclick=fn; return b;
+}
+function showTitle(){
+  S=null; C=null; drawHUD(); setScene("title","torch");
+  stage.innerHTML="";
+  const c=document.createElement("div"); c.className="center";
+  const t=document.createElement("div"); t.id="bigtitle"; t.textContent="汉字冒险";
+  const st=document.createElement("div"); st.className="subtitle"; st.textContent="HANZI QUEST · 8-BIT MANDARIN";
+  c.append(t,st);
+  const save=loadGame();
+  c.appendChild(menuBtn("开始","NEW GAME — pick a level",showLevels));
+  c.appendChild(menuBtn("继续", save?("CONTINUE — LV"+save.level+" · "+LEVELS[save.level].name):"CONTINUE — no save found",
+    ()=>{ const s=loadGame(); if(s){S=s; goNode(S.node);} }, !save));
+  c.appendChild(menuBtn("重置","RESET — erase save + unlocks",()=>{
+    if(confirm("Reset everything? 重置所有进度？")){ wipe(); unlocked=[1]; showToast("已重置 · reset done"); showTitle(); }
+  }));
+  stage.appendChild(c);
+}
+function showLevels(){
+  setScene("title","torch"); stage.innerHTML="";
+  const c=document.createElement("div"); c.className="center";
+  const st=document.createElement("div"); st.className="subtitle"; st.textContent="SELECT LEVEL · 选关";
+  c.appendChild(st);
+  [[1,"第一关 · 山洞","HSK 1 · THE CAVE"],
+   [2,"第二关 · 森林","HSK 2 · THE FOREST"],
+   [3,"第三关 · 小城","HSK 3 · THE TOWN"],
+   [4,"第四关 · 小岛","HSK 4 · THE ISLAND"],
+   [5,"第五关 · 雪山","HSK 5 · SNOW MOUNTAIN"],
+   [6,"第六关 · 古庙","HSK 6 · THE ANCIENT TEMPLE"]].forEach(([n,zh,en])=>{
+    const exists=!!LEVELS[n];
+    const locked = !exists || !unlocked.includes(n);
+    const sub = !exists ? "IN THE WORKSHOP"
+              : locked ? ("FINISH LV"+(n-1)+" TO UNLOCK") : en;
+    const b=menuBtn(locked?("🔒 "+zh):zh, sub,
+      locked?null:()=>startLevel(n), locked);
+    b.classList.add("lvlcard"); c.appendChild(b);
+  });
+  c.appendChild(menuBtn("回主页","BACK TO TITLE",showTitle));
+  stage.appendChild(c);
+}
+function startLevel(n){
+  const lv=LEVELS[n];
+  S={level:n,node:lv.start,hp:lv.maxhp,items:[]};
+  goNode(lv.start);
+}
+
+/* HUD buttons */
+$("#btnSave").onclick=()=>saveGame(false);
+$("#btnHome").onclick=()=>{ if(!S || confirm("Back to title? Unsaved progress is lost.\n回主页？")) showTitle(); };
+document.addEventListener("scroll",tipHide,true);
+</script>
+<script>
+/* ============================================================
+   PIXEL ART — canvas backgrounds, sprites, animation loop
+   Sprites are tiny char-map strings; '.'=transparent.
+   ============================================================ */
+const cv=$("#view"), cx=cv.getContext("2d");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const PAL={g:"#8a8a9e",G:"#5c5c70",p:"#e8a0b4",k:"#1a1626",o:"#e8913c",
+  O:"#b4632a",w:"#f2e9d8",b:"#3d2b1f",B:"#5c4030",y:"#ffd75e",Y:"#c9a227",
+  r:"#e0566b",d:"#3a3154",D:"#2b2344",e:"#7ee08a",E:"#3f7a44",s:"#7ec8e8",
+  t:"#6b4f35",n:"#2e4632",x:"#c9c2d8"};
+const SPR={
+rat:[
+"................",
+"....kk....kk....",
+"...kppk..kppk...",
+"...kgggkkgggk...",
+"..kggggggggggk..",
+".kgggkggggkgggk.",
+".kgggggggggggk..",
+".kggggggwwggggk.",
+"..kggggggggggk..",
+"...kggggggggk.pp",
+"....kkkkkkkkkpp.",
+"......k..k......"],
+cat:[
+"................",
+"...ok....ko.....",
+"...ook..koo.....",
+"...ooooooooo....",
+"..ookoookooo....",
+"..oooooooooo....",
+"..ooowkwooooo...",
+"...ooooooooooo..",
+"...oOoooOooooo..",
+"...oooooooooO...",
+"...ok.ok..ooO...",
+"................"],
+dog:[
+"................",
+"..bb........bb..",
+".bBBb......bBBb.",
+".bBBBbbbbbbBBBb.",
+".bBBBBBBBBBBBBb.",
+"..bBBkBBBBkBBb..",
+"..bBBBBBBBBBBb..",
+"..bBBBwwwwBBBb..",
+"...bBBBBBBBBb...",
+"...bBB....BBb...",
+"...bb......bb...",
+"................"],
+wolf:[
+"................",
+".GG..........GG.",
+".GGG........GGG.",
+".GGGGGGGGGGGGGG.",
+"..GGGrGGGGrGGG..",
+"..GGGGGGGGGGGG..",
+"..GGGwwwwwwGGG..",
+"...GGGGGGGGGG...",
+"...GGG....GGG...",
+"...GG......GG...",
+"................",
+"................"],
+bird:[
+"................",
+"................",
+".....sss........",
+"....sksss.......",
+"....ssssso......",
+"....ssssss......",
+"...ssssssss.....",
+"..s.ssssss......",
+".....ss.ss......",
+".....o..o.......",
+"................",
+"................"],
+oldman:[
+"......xxx.......",
+".....xwwwx......",
+".....xwkwx......",
+".....xwwwx......",
+"....ddddddd.....",
+"...dddddddddt...",
+"...ddddddddd.t..",
+"...ddddddddd.t..",
+"...ddddddddd.t..",
+"....ddddddd..t..",
+"....dd...dd.....",
+"....bb...bb....."],
+key:[
+"................",
+"................",
+"....yyyy........",
+"...yy..yy.......",
+"...yy..yy.......",
+"....yyyy........",
+".....yy.........",
+".....yy.........",
+".....yyyy.......",
+".....yy.........",
+".....yyyy.......",
+"................"],
+coins:[
+"................",
+"................",
+"................",
+"......yy........",
+"....yyYYyy......",
+"...yYYyyYYy.....",
+"..yyYyyyyYyy....",
+"..yYyyYYyyYy....",
+"..yyYYyyYYyy....",
+"...yyyYYyyy.....",
+"....yyyyyy......",
+"................"],
+sun:[
+"................",
+".....yyyyyy.....",
+"...yyyyyyyyyy...",
+"..yyyyyyyyyyyy..",
+"..yyyyyyyyyyyy..",
+".yyyyyyyyyyyyyy.",
+".yyyyyyyyyyyyyy.",
+"..yyyyyyyyyyyy..",
+"..yyyyyyyyyyyy..",
+"...yyyyyyyyyy...",
+".....yyyyyy.....",
+"................"],
+house:[
+"................",
+".......rr.......",
+".....rrrrrr.....",
+"...rrrrrrrrrr...",
+".rrrrrrrrrrrrrr.",
+".wwwwwwwwwwwwww.",
+".wwyywwwwwwyyww.",
+".wwyywwbbwwyyww.",
+".wwwwwwbbwwwwww.",
+".wwwwwwbbwwwwww.",
+".wwwwwwbbwwwwww.",
+"................"],
+torch:[
+"................",
+".......y........",
+"......yyy.......",
+".....yooyy......",
+".....yoooy......",
+"......ooo.......",
+".......t........",
+".......t........",
+".......t........",
+".......t........",
+"................",
+"................"],
+man:[
+"................",
+".....ddddd......",
+".....ddddd......",
+".....wwwww......",
+".....wkwkw......",
+".....wwwww......",
+"....GGGGGGG.....",
+"...GGGGGGGGG....",
+"...G.GGGGG.G....",
+".....kkkkk......",
+".....kk.kk......",
+".....bb.bb......"],
+bag:[
+"................",
+"................",
+"......bb........",
+".....b..b.......",
+"....BBBBBB......",
+"...BBBBBBBB.....",
+"...BBBBBBBB.....",
+"...BByybBBB.....",
+"...BBBBBBBB.....",
+"....BBBBBB......",
+"................",
+"................"],
+book:[
+"................",
+"................",
+"...wwwwwwwww....",
+"..wwwwwwwwwww...",
+"..wssswwsssww...",
+"..wwwwwwwwwww...",
+"..wssswwsssww...",
+"..wwwwwwwwwww...",
+"..rrrrrrrrrrr...",
+"................",
+"................",
+"................"],
+captain:[
+"................",
+"....wwwwwww.....",
+".....wwwww......",
+".....ooooo......",
+".....okoko......",
+".....ooooo......",
+"....ddddddd.....",
+"...ddddddddd....",
+"...d.ddddd.d....",
+".....kkkkk......",
+".....kk.kk......",
+".....bb.bb......"],
+doctor:[
+"................",
+".....ooooo......",
+".....okoko......",
+".....ooooo......",
+"....wwwwwww.....",
+"...wwwwwwwww....",
+"...w.wwrww.w....",
+"...w.wwwww.w....",
+"....wwwwwww.....",
+".....ww.ww......",
+".....bb.bb......",
+"................"],
+snake:[
+"................",
+"......eeee......",
+".....eereee.....",
+".....eeeeee.....",
+"......ee..e.....",
+"....EEee........",
+"...EeeeeEE......",
+"..EeeEEeeeE.....",
+"..EeeeeeeeE.....",
+"...EEeeeeE......",
+"....EEEE........",
+"................"],
+flower:[
+"................",
+"................",
+"......ss........",
+".....ssss.......",
+"....ssyyss......",
+".....ssss.......",
+"......ee........",
+"......ee........",
+".....eeee.......",
+"......ee........",
+"................",
+"................"],
+yeti:[
+"................",
+"...xxxxxxxxx....",
+"..xxxxxxxxxxx...",
+"..xxkxxxxkxxx...",
+"..xxxxxxxxxxx...",
+"..xxxkkkxxxxx...",
+".xxxxxxxxxxxxx..",
+".xxx.xxxxx.xxx..",
+".xxxxxxxxxxxxx..",
+"..xxx.....xxx...",
+"..xxx.....xxx...",
+"..xxx.....xxx..."],
+golem:[
+"................",
+"...GGGGGGGGG....",
+"...GGGGGGGGG....",
+"...GGyGGGyGG....",
+"...GGGGGGGGG....",
+"...GGGGGGGGG....",
+"..GG.GGGGG.GG...",
+"..GG.GGGGG.GG...",
+"...G.GGGGG.G....",
+"....GGG.GGG.....",
+"....GGG.GGG.....",
+"....GG...GG....."]
+};
+function drawSprite(name,x,y,scale){
+  const m=SPR[name]; if(!m) return;
+  for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){
+    const ch=m[r][c]; if(ch===".")continue;
+    cx.fillStyle=PAL[ch]||"#fff";
+    cx.fillRect(x+c*scale,y+r*scale,scale,scale);
+  }
+}
+/* deterministic pseudo-random for stable scenery */
+function h2(i,j){ const n=Math.sin(i*127.1+j*311.7)*43758.5453; return n-Math.floor(n); }
+
+let scene={bg:"title",sprite:"torch"}, T=0;
+let shake=0, flash=null;
+const fx={
+  hitEnemy(){ shake=8; flash="rgba(255,255,255,.25)"; },
+  hitPlayer(){ shake=8; flash="rgba(224,86,107,.3)"; }
+};
+function setScene(bg,sprite){ scene={bg,sprite}; }
+
+function bgCave(dk){
+  cx.fillStyle=dk?"#0d0a17":"#1c1730"; cx.fillRect(0,0,320,150);
+  cx.fillStyle=dk?"#141021":"#262040";
+  for(let i=0;i<20;i++)for(let j=0;j<6;j++)
+    if(h2(i,j)>.5) cx.fillRect(i*16+((j%2)*8),j*10,14,8);      /* brick wall */
+  cx.fillStyle=dk?"#171226":"#2e2749"; cx.fillRect(0,110,320,40); /* floor */
+  for(let i=0;i<10;i++) if(h2(i,9)>.6){ cx.fillStyle="#3a3154"; cx.fillRect(i*34+6,118+((i%3)*8),10,4); }
+}
+function torchAt(x,y){
+  drawSprite("torch",x,y,2);
+  const fl=reduceMotion?0.5:(0.5+0.18*Math.sin(T/38)+0.07*h2(T>>5,x));
+  const g=cx.createRadialGradient(x+15,y+8,4,x+15,y+8,55);
+  g.addColorStop(0,`rgba(255,179,71,${0.30*fl+0.15})`);
+  g.addColorStop(1,"rgba(255,179,71,0)");
+  cx.fillStyle=g; cx.fillRect(x-45,y-45,120,120);
+}
+function bgForest(){
+  cx.fillStyle="#0d1120"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#f2e9d8";
+  for(let i=0;i<26;i++) cx.fillRect(Math.floor(h2(i,1)*320),Math.floor(h2(i,2)*70),1,1); /* stars */
+  for(let i=0;i<9;i++){ const x=i*38+((i%2)*10);
+    cx.fillStyle="#16241c"; cx.fillRect(x+10,30+(i%3)*6,10,90);
+    cx.fillStyle="#1e3527"; cx.fillRect(x,20+(i%3)*6,30,50); }
+  cx.fillStyle="#152218"; cx.fillRect(0,118,320,32);
+}
+function bgRiver(){
+  bgForest();
+  cx.fillStyle="#274a66"; cx.fillRect(0,112,320,38);
+  cx.fillStyle="#3f6f94";
+  for(let i=0;i<14;i++){ const off=reduceMotion?0:Math.floor(T/6);
+    cx.fillRect(((i*29+off)%330)-5,118+(i%4)*8,14,2); }
+}
+function bgCamp(){
+  cx.fillStyle="#131022"; cx.fillRect(0,0,320,150);
+  for(let i=0;i<7;i++){ const x=i*48;
+    cx.fillStyle="#141c16"; cx.fillRect(x+12,26,8,80);
+    cx.fillStyle="#1a2a1f"; cx.fillRect(x+2,20,28,40); }
+  cx.fillStyle="#1d1830"; cx.fillRect(0,106,320,44);
+  /* campfire */
+  cx.fillStyle="#5c4030"; cx.fillRect(140,122,40,6);
+  const fl=reduceMotion?0.6:(0.5+0.25*Math.sin(T/26));
+  cx.fillStyle="#e8913c"; cx.fillRect(150,110-fl*6,20,14+fl*6);
+  cx.fillStyle="#ffd75e"; cx.fillRect(155,116-fl*4,10,10+fl*4);
+  const g=cx.createRadialGradient(160,118,6,160,118,70);
+  g.addColorStop(0,`rgba(255,179,71,${0.25+0.15*fl})`); g.addColorStop(1,"rgba(255,179,71,0)");
+  cx.fillStyle=g; cx.fillRect(90,48,140,120);
+}
+function bgOutside(){
+  cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#5c5c70"; /* mountains */
+  cx.beginPath(); cx.moveTo(0,120); cx.lineTo(70,55); cx.lineTo(140,120); cx.fill();
+  cx.beginPath(); cx.moveTo(110,120); cx.lineTo(200,40); cx.lineTo(290,120); cx.fill();
+  cx.fillStyle="#8a8a9e";
+  cx.beginPath(); cx.moveTo(240,120); cx.lineTo(300,70); cx.lineTo(340,120); cx.fill();
+  cx.fillStyle="#3f7a44"; cx.fillRect(0,118,320,32);
+  cx.fillStyle="#7ee08a"; for(let i=0;i<20;i++) cx.fillRect(i*17+4,120+(i%3)*6,3,3);
+}
+function bgHome(){
+  cx.fillStyle="#33283f"; cx.fillRect(0,0,320,150);         /* wall */
+  cx.fillStyle="#241b2e"; cx.fillRect(0,112,320,38);        /* floor */
+  cx.fillStyle="#5c4030"; cx.fillRect(226,28,58,48);        /* window frame */
+  cx.fillStyle="#7ec8e8"; cx.fillRect(231,33,48,38);        /* morning sky */
+  cx.fillStyle="#ffd75e"; cx.fillRect(233,35,14,12);        /* sun */
+  cx.fillStyle="#5c4030"; cx.fillRect(253,33,4,38); cx.fillRect(231,50,48,4);
+  cx.fillStyle="#5c4030"; cx.fillRect(36,86,74,8);          /* table */
+  cx.fillRect(42,94,8,22); cx.fillRect(96,94,8,22);
+  cx.fillStyle="#3d2b1f"; cx.fillRect(140,60,44,54);        /* open door */
+  cx.fillStyle="#171226"; cx.fillRect(146,66,32,48);
+}
+function bgTown(){
+  cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);         /* day sky */
+  const cols=["#4a3f6b","#5c5c70","#3a3154","#4a3f6b","#5c5c70"];
+  for(let i=0;i<5;i++){ const x=i*66-10, h=60+Math.floor(h2(i,3)*36);
+    cx.fillStyle=cols[i]; cx.fillRect(x,116-h,58,h);
+    cx.fillStyle="#ffd75e";
+    for(let r=0;r<Math.floor(h/16);r++)for(let c=0;c<3;c++)
+      if(h2(i*10+r,c)>.4) cx.fillRect(x+8+c*16,124-h+r*16,7,8);
+    cx.fillStyle="#2e2749"; cx.fillRect(x,116-h,58,5); }   /* roof line */
+  cx.fillStyle="#2b2344"; cx.fillRect(0,116,320,34);        /* street */
+  cx.fillStyle="#4a3f6b"; for(let i=0;i<8;i++) cx.fillRect(i*44+8,132,20,3);
+}
+function bgPark(){
+  cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#3f7a44"; cx.fillRect(0,108,320,42);        /* grass */
+  cx.fillStyle="#7ee08a"; for(let i=0;i<22;i++) cx.fillRect(i*15+3,112+(i%4)*8,3,3);
+  for(let i=0;i<5;i++){ const x=i*70+8;
+    cx.fillStyle="#6b4f35"; cx.fillRect(x+16,72,8,42);      /* trunks */
+    cx.fillStyle="#2e6b38"; cx.fillRect(x+2,44,36,34);
+    cx.fillStyle="#3f7a44"; cx.fillRect(x+8,38,24,14); }
+}
+function bgRoof(){
+  cx.fillStyle="#0d1120"; cx.fillRect(0,0,320,150);         /* night */
+  cx.fillStyle="#f2e9d8";
+  for(let i=0;i<30;i++) cx.fillRect(Math.floor(h2(i,5)*320),Math.floor(h2(i,6)*80),1,1);
+  cx.fillStyle="#f2e9d8"; cx.fillRect(248,20,30,30);        /* moon */
+  cx.fillStyle="#c9c2d8"; cx.fillRect(254,26,8,8); cx.fillRect(266,38,6,6);
+  cx.fillStyle="#1d1830";                                   /* far rooftops */
+  for(let i=0;i<7;i++) cx.fillRect(i*48-6,92+((i%3)*8),44,60);
+  cx.fillStyle="#2b2344"; cx.fillRect(0,118,320,32);        /* this rooftop */
+  cx.fillStyle="#3a3154"; cx.fillRect(0,118,320,5);
+}
+function bgHarbor(){
+  cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);          /* sky */
+  cx.fillStyle="#274a66"; cx.fillRect(0,84,320,40);          /* sea */
+  cx.fillStyle="#3f6f94";
+  for(let i=0;i<12;i++){ const off=reduceMotion?0:Math.floor(T/7);
+    cx.fillRect(((i*31+off)%330)-5,90+(i%3)*10,16,2); }
+  cx.fillStyle="#6b4f35"; cx.fillRect(0,118,320,32);         /* dock */
+  cx.fillStyle="#5c4030"; for(let i=0;i<11;i++) cx.fillRect(i*30,118,26,32);
+  cx.fillStyle="#5c4030"; cx.fillRect(236,58,50,30);         /* hull */
+  cx.fillStyle="#6b4f35"; cx.fillRect(258,20,4,42);          /* mast */
+  cx.fillStyle="#f2e9d8"; cx.fillRect(262,24,22,26);         /* sail */
+}
+function bgSea(){
+  cx.fillStyle="#5c7a94"; cx.fillRect(0,0,320,150);          /* stormy sky */
+  cx.fillStyle="#8a8a9e";
+  for(let i=0;i<5;i++) cx.fillRect(20+i*62,18+(i%2)*14,44,10); /* clouds */
+  cx.fillStyle="#1d3a52"; cx.fillRect(0,92,320,58);          /* deep sea */
+  cx.fillStyle="#2e5a7a";
+  for(let i=0;i<16;i++){ const off=reduceMotion?0:Math.floor(T/5);
+    cx.fillRect(((i*27+off)%336)-8,98+(i%5)*10,18,3); }
+  const rock=reduceMotion?0:Math.round(Math.sin(T/16)*3);   /* boat rocks */
+  cx.fillStyle="#5c4030"; cx.fillRect(126,72+rock,68,24);
+  cx.fillStyle="#6b4f35"; cx.fillRect(156,34+rock,4,40);
+  cx.fillStyle="#f2e9d8"; cx.fillRect(160,38+rock,26,28);
+}
+function bgBeach(){
+  cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#274a66"; cx.fillRect(0,78,320,26);          /* sea strip */
+  cx.fillStyle="#e8d8a0"; cx.fillRect(0,104,320,46);         /* sand */
+  cx.fillStyle="#c9b978"; for(let i=0;i<16;i++) cx.fillRect(i*21+4,112+(i%4)*8,4,2);
+  cx.fillStyle="#5c5c70"; cx.fillRect(214,34,106,70);        /* cliff */
+  cx.fillStyle="#171226"; cx.fillRect(248,62,40,42);         /* cave mouth */
+}
+function bgVillage(){
+  cx.fillStyle="#aebfd8"; cx.fillRect(0,0,320,150);          /* winter sky */
+  cx.fillStyle="#e8ecf4"; cx.fillRect(0,104,320,46);         /* snow ground */
+  for(let i=0;i<3;i++){ const x=i*104+16;
+    cx.fillStyle="#5c4030"; cx.fillRect(x,72,64,34);         /* houses */
+    cx.fillStyle="#3d2b1f"; cx.fillRect(x+24,84,16,22);
+    cx.fillStyle="#ffd75e"; cx.fillRect(x+8,80,10,10);
+    cx.fillStyle="#e8ecf4"; cx.fillRect(x-4,62,72,12); }     /* snowy roofs */
+  cx.fillStyle="#f2e9d8";                                    /* falling snow */
+  for(let i=0;i<24;i++){ const off=reduceMotion?0:Math.floor(T/3);
+    cx.fillRect(Math.floor(h2(i,7)*320),((Math.floor(h2(i,8)*150)+off)%150),2,2); }
+}
+function bgSnowmtn(){
+  cx.fillStyle="#8fa5c4"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#e8ecf4";                                    /* slope */
+  cx.beginPath(); cx.moveTo(0,150); cx.lineTo(320,150); cx.lineTo(320,96); cx.lineTo(0,132); cx.fill();
+  cx.fillStyle="#c9d4e8";
+  cx.beginPath(); cx.moveTo(180,96); cx.lineTo(320,26); cx.lineTo(320,96); cx.fill();
+  cx.fillStyle="#f2e9d8";                                    /* blowing snow */
+  for(let i=0;i<26;i++){ const off=reduceMotion?0:Math.floor(T/2);
+    cx.fillRect(((Math.floor(h2(i,9)*320)-off)%320+320)%320,Math.floor(h2(i,4)*120),4,1); }
+}
+function bgSnowcave(){
+  cx.fillStyle="#1a2438"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#243452";
+  for(let i=0;i<20;i++)for(let j=0;j<6;j++)
+    if(h2(i+40,j)>.5) cx.fillRect(i*16+((j%2)*8),j*10,14,8);
+  cx.fillStyle="#7ec8e8";                                    /* icicles */
+  for(let i=0;i<9;i++) cx.fillRect(i*36+10,0,5,10+Math.floor(h2(i,11)*16));
+  cx.fillStyle="#2e405c"; cx.fillRect(0,112,320,38);         /* ice floor */
+  cx.fillStyle="#7ec8e8"; for(let i=0;i<8;i++) cx.fillRect(i*42+8,120+(i%3)*8,12,2);
+}
+function bgTemple(){
+  cx.fillStyle="#c47a5c"; cx.fillRect(0,0,320,60);           /* dusk sky */
+  cx.fillStyle="#8fa5c4"; cx.fillRect(0,60,320,40);          /* clouds below peak */
+  cx.fillStyle="#5c5c70"; cx.fillRect(0,96,320,54);          /* stone summit */
+  cx.fillStyle="#4a3f6b"; for(let i=0;i<5;i++) cx.fillRect(0,100+i*10,320,3); /* steps */
+  cx.fillStyle="#8a3838"; cx.fillRect(36,34,14,66); cx.fillRect(270,34,14,66); /* pillars */
+  cx.fillStyle="#d94f4f"; cx.fillRect(36,34,14,6); cx.fillRect(270,34,14,6);
+  cx.fillStyle="#3a2b20"; cx.fillRect(20,22,280,14);         /* roof beam */
+  cx.fillStyle="#8a3838"; cx.fillRect(10,16,300,8);
+}
+function bgShrine(){
+  cx.fillStyle="#1d1526"; cx.fillRect(0,0,320,150);
+  cx.fillStyle="#2b1f33";
+  for(let i=0;i<20;i++)for(let j=0;j<6;j++)
+    if(h2(i+80,j)>.5) cx.fillRect(i*16+((j%2)*8),j*10,14,8);
+  cx.fillStyle="#241b2e"; cx.fillRect(0,112,320,38);
+  cx.fillStyle="#c9c2d8"; cx.fillRect(128,34,64,74);         /* mirror */
+  cx.fillStyle="#e8ecf4"; cx.fillRect(134,40,52,62);
+  cx.fillStyle="#c9a227"; cx.strokeStyle="#c9a227";
+  cx.strokeRect(127.5,33.5,65,75);
+  cx.fillStyle="#5c5c70"; cx.fillRect(36,72,40,40);          /* stone tablet */
+  cx.fillStyle="#3a3154"; for(let i=0;i<4;i++) cx.fillRect(44,78+i*8,24,3);
+  const fl=reduceMotion?0.5:(0.5+0.25*Math.sin(T/30));       /* candles */
+  cx.fillStyle="#f2e9d8"; cx.fillRect(246,92,6,16); cx.fillRect(266,96,6,12);
+  cx.fillStyle=`rgba(255,179,71,${0.6+0.3*fl})`;
+  cx.fillRect(247,86-fl*3,4,7); cx.fillRect(267,90-fl*3,4,7);
+}
+function drawDoors(){
+  cx.fillStyle="#5c4030"; cx.fillRect(50,52,52,62);   /* big door */
+  cx.fillStyle="#3d2b1f"; cx.fillRect(56,58,40,56);
+  cx.fillStyle="#ffd75e"; cx.fillRect(88,86,4,6);
+  cx.fillStyle="#5c4030"; cx.fillRect(226,76,34,38);  /* small door */
+  cx.fillStyle="#3d2b1f"; cx.fillRect(230,80,26,34);
+  cx.fillStyle="#ffd75e"; cx.fillRect(250,94,3,5);
+  cx.fillStyle="#5c4030"; cx.fillRect(140,62,44,52);  /* middle door, hot */
+  const fl=reduceMotion?0.5:(0.5+0.3*Math.sin(T/26));
+  cx.fillStyle=`rgba(224,86,107,${0.5+0.3*fl})`; cx.fillRect(145,67,34,47);
+  cx.fillStyle=`rgba(255,179,71,${0.4+0.3*fl})`; cx.fillRect(151,74,22,40);
+}
+function drawBackdoor(){
+  cx.fillStyle="#2b2344"; cx.fillRect(132,56,58,58);
+  cx.fillStyle="#171226"; cx.fillRect(138,62,46,52);
+  cx.fillStyle="#ffd75e"; cx.fillRect(176,86,4,7);
+  cx.strokeStyle="#4a3f6b"; cx.strokeRect(132.5,56.5,57,57);
+}
+function loop(){
+  T++;
+  const sx = shake>0 ? (Math.random()*shake-shake/2) : 0;
+  if(shake>0) shake-=1;
+  cx.save(); cx.translate(sx,0);
+  const b=scene.bg;
+  if(b==="cave"){ bgCave(false); torchAt(18,44); torchAt(282,44); }
+  else if(b==="dark"){ bgCave(true); torchAt(150,40); }
+  else if(b==="battle"){ bgCave(true); torchAt(18,44); torchAt(282,44); }
+  else if(b==="forest") bgForest();
+  else if(b==="river") bgRiver();
+  else if(b==="camp") bgCamp();
+  else if(b==="home") bgHome();
+  else if(b==="town") bgTown();
+  else if(b==="park") bgPark();
+  else if(b==="roof") bgRoof();
+  else if(b==="harbor") bgHarbor();
+  else if(b==="sea") bgSea();
+  else if(b==="beach") bgBeach();
+  else if(b==="village") bgVillage();
+  else if(b==="snowmtn") bgSnowmtn();
+  else if(b==="snowcave") bgSnowcave();
+  else if(b==="temple") bgTemple();
+  else if(b==="shrine") bgShrine();
+  else if(b==="exit"){ bgCave(true);
+    const g=cx.createRadialGradient(160,80,10,160,80,120);
+    g.addColorStop(0,"rgba(255,215,94,.5)"); g.addColorStop(1,"rgba(255,215,94,0)");
+    cx.fillStyle=g; cx.fillRect(0,0,320,150); }
+  else if(b==="outside") bgOutside();
+  else { /* title */ bgCave(false); torchAt(60,50); torchAt(230,50); }
+  /* sprite */
+  const s=scene.sprite;
+  if(s==="doors") drawDoors();
+  else if(s==="backdoor") drawBackdoor();
+  else if(s==="firedoor"){ drawDoors(); }
+  else if(s==="torch"){ /* title torches already drawn */ }
+  else if(s && SPR[s]){
+    const bob=reduceMotion?0:Math.round(Math.sin(T/18)*2);
+    const scale = C?7:6;
+    const w=16*scale;
+    drawSprite(s,160-w/2,(C?24:36)+bob,scale);
+  }
+  cx.restore();
+  if(flash){ cx.fillStyle=flash; cx.fillRect(0,0,320,150); flash=null; }
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- boot ---------------- */
+loadUnlocked();
+loop();
+showTitle();
+if(!store()){
+  const note=document.createElement("div");
+  note.className="bubble sys";
+  note.textContent="NOTE: this browser view blocks saving. Download the file and open it locally (double-click) and 存 SAVE will persist.";
+  stage.prepend(note);
+}
+</script>
+</body>
+</html>
