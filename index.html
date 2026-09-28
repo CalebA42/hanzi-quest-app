@@ -24,6 +24,8 @@
   --lantern:#d94f4f;      /* accents, title */
   --cjk:"Noto Sans CJK SC","Noto Sans SC","PingFang SC","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif;
   --ui:"DejaVu Sans Mono","Menlo","Consolas","Courier New",monospace;
+  --tip-py-size:16px;
+  --tip-en-size:14px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -136,8 +138,11 @@ ruby rt{
   padding:8px 12px;max-width:240px;box-shadow:0 6px 18px rgba(0,0,0,.6);
 }
 #tip .th{font-size:20px}
-#tip .tp{font-family:var(--ui);font-size:13px;color:var(--amber);margin:2px 0}
-#tip .te{font-family:var(--ui);font-size:12px;color:var(--dim)}
+#tip .tp{font-family:var(--ui);font-size:var(--tip-py-size);color:var(--amber);margin:2px 0;line-height:1.4}
+#tip .te{font-family:var(--ui);font-size:var(--tip-en-size);color:var(--dim)}
+.tipsize-group{display:flex;gap:2px}
+.tipsize-group .hudbtn{padding:4px 7px}
+.tipsize-group .hudbtn.on{color:var(--amber);border-color:var(--amber)}
 /* ---- title & menus ---- */
 .center{display:flex;flex-direction:column;align-items:center;gap:14px;padding:34px 16px 40px;text-align:center}
 #bigtitle{
@@ -190,6 +195,11 @@ ruby rt{
       <span id="hudlvl" class="tag"></span>
       <span id="hearts"></span>
       <span class="grow"></span>
+      <span class="tipsize-group" title="Tooltip font size">
+        <button class="hudbtn" id="tsS">S</button>
+        <button class="hudbtn" id="tsM">M</button>
+        <button class="hudbtn" id="tsL">L</button>
+      </span>
       <button class="hudbtn" id="btnSave" title="Save progress">存 SAVE</button>
       <button class="hudbtn" id="btnHome" title="Back to title">主页 HOME</button>
     </div>
@@ -974,6 +984,15 @@ function persist(key,val){ const st=store(); if(st) st.setItem(key,val); else me
 function recall(key){ const st=store(); return st ? st.getItem(key) : (memStore[key]??null); }
 function wipe(){ const st=store(); if(st){st.removeItem("hq_save");st.removeItem("hq_unlocked");} memStore={}; }
 
+const TIP_SIZES={S:[13,12],M:[16,14],L:[20,17]};
+function setTipSize(k){
+  const [py,en]=TIP_SIZES[k]||TIP_SIZES.M;
+  document.documentElement.style.setProperty("--tip-py-size",py+"px");
+  document.documentElement.style.setProperty("--tip-en-size",en+"px");
+  persist("hq_tip_size",k);
+  ["S","M","L"].forEach(s=>$("#ts"+s).classList.toggle("on",s===k));
+}
+
 function showToast(msg){ toast.textContent=msg; toast.classList.add("show");
   clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove("show"),1600); }
 
@@ -1232,6 +1251,8 @@ function startLevel(n){
 /* HUD buttons */
 $("#btnSave").onclick=()=>saveGame(false);
 $("#btnHome").onclick=()=>{ if(!S || confirm("Back to title? Unsaved progress is lost.\n回主页？")) showTitle(); };
+["S","M","L"].forEach(s=>$("#ts"+s).onclick=()=>setTipSize(s));
+setTipSize(recall("hq_tip_size")||"M");
 document.addEventListener("scroll",tipHide,true);
 </script>
 <script>
