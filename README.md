@@ -1,8 +1,21 @@
 # 汉字冒险 · Hanzi Quest
 
-An 8-bit Mandarin reading adventure across HSK levels 1–6. The whole game
-lives in `index.html`; Electron packages it as a native desktop app with a
-launcher icon and durable saves.
+An 8-bit Mandarin reading adventure across HSK levels 1–6.
+
+## Play now (no download required)
+
+**[▶ Play in your browser](https://caleba42.github.io/hanzi-quest-app/)**
+
+| Option | Best for |
+|--------|----------|
+| Browser | Quick play, any device, no install |
+| Desktop download | Offline play, better speech synthesis, saves tied to your machine |
+
+### Saves in the browser version
+
+The 存 SAVE button uses your browser's localStorage, so your progress persists
+between sessions as long as you use the same browser and don't clear site data.
+Each browser keeps its own separate save (Chrome and Firefox won't share one).
 
 ## Download a release (Linux & Windows)
 
@@ -77,14 +90,11 @@ opens the game in a dev window instantly. Useful when iterating on
 
 ## Where saves live
 
-The 存 SAVE button writes to the app's own profile directory — independent
-of any browser, and it survives browser-cache cleanups. Delete the folder to
-fully reset everything.
-
-| Platform | Path |
-|----------|------|
-| Linux    | `~/.config/Hanzi Quest/` |
-| Windows  | `%APPDATA%\Hanzi Quest\` |
+| Version | Where | Notes |
+|---------|-------|-------|
+| Browser | localStorage in your browser | Clears if you wipe site data; separate per browser |
+| Linux desktop | `~/.config/Hanzi Quest/` | Survives browser-cache cleanups |
+| Windows desktop | `%APPDATA%\Hanzi Quest\` | Survives browser-cache cleanups |
 
 ## Troubleshooting
 
