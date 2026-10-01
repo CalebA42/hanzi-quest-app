@@ -143,6 +143,37 @@ ruby rt{
 .tipsize-group{display:flex;gap:2px}
 .tipsize-group .hudbtn{padding:4px 7px}
 .tipsize-group .hudbtn.on{color:var(--amber);border-color:var(--amber)}
+/* ---- about modal ---- */
+#about-backdrop{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.75);
+  display:none;align-items:center;justify-content:center;
+}
+#about-backdrop.open{display:flex}
+#about-panel{
+  background:var(--panel-2);border:2px solid var(--stone);border-radius:8px;
+  padding:20px 24px;max-width:320px;width:90%;
+  font-family:var(--ui);color:var(--paper);
+  box-shadow:0 12px 40px rgba(0,0,0,.6);
+}
+#about-panel .about-title{font-family:var(--cjk);font-size:20px;margin-bottom:2px}
+#about-panel .about-ver{font-size:11px;color:var(--dim);margin-bottom:4px}
+#about-panel .about-sub{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px}
+.about-link{
+  display:block;width:100%;background:none;
+  border:none;border-bottom:1px solid var(--stone);
+  color:var(--amber);font-family:var(--ui);font-size:12px;letter-spacing:1px;
+  text-align:left;padding:7px 0;cursor:pointer;
+}
+.about-link:hover{color:var(--paper)}
+.about-link:last-of-type{border-bottom:none}
+#about-close{
+  display:block;width:100%;margin-top:14px;
+  font-family:var(--ui);font-size:11px;letter-spacing:1px;
+  background:var(--panel);color:var(--dim);
+  border:2px solid var(--stone);border-radius:4px;padding:6px;cursor:pointer;
+}
+#about-close:hover{border-color:var(--amber);color:var(--amber)}
 /* ---- title & menus ---- */
 .center{display:flex;flex-direction:column;align-items:center;gap:14px;padding:34px 16px 40px;text-align:center}
 #bigtitle{
@@ -213,6 +244,19 @@ ruby rt{
 </div>
 <div id="tip"><div class="th"></div><div class="tp"></div><div class="te"></div></div>
 <div id="toast"></div>
+<div id="about-backdrop">
+  <div id="about-panel">
+    <div class="about-title">汉字冒险 · Hanzi Quest</div>
+    <div class="about-ver" id="about-ver"></div>
+    <div class="about-sub">8-bit Mandarin adventure</div>
+    <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app">⌂ GitHub Repository →</button>
+    <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app/releases">↓ Download for Offline Play →</button>
+    <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app/issues">✎ Bug Reports &amp; Feedback →</button>
+    <button class="about-link" data-url="https://ko-fi.com/caleba42">♥ Support on Ko-fi →</button>
+    <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app/blob/main/LICENSE">© MIT License →</button>
+    <button id="about-close">CLOSE</button>
+  </div>
+</div>
 <script>
 /* ============================================================
    DICTIONARY — every word used in the game.
@@ -993,6 +1037,17 @@ function setTipSize(k){
   ["S","M","L"].forEach(s=>$("#ts"+s).classList.toggle("on",s===k));
 }
 
+const APP_VERSION = "1.1.0";
+function openLink(url){
+  if(window.hanziBridge) window.hanziBridge.openExternal(url);
+  else window.open(url,"_blank","noopener,noreferrer");
+}
+function showAbout(){
+  $("#about-ver").textContent="v"+(window.hanziBridge?.version??APP_VERSION);
+  $("#about-backdrop").classList.add("open");
+}
+function hideAbout(){ $("#about-backdrop").classList.remove("open"); }
+
 function showToast(msg){ toast.textContent=msg; toast.classList.add("show");
   clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove("show"),1600); }
 
@@ -1218,6 +1273,7 @@ function showTitle(){
   c.appendChild(menuBtn("重置","RESET — erase save + unlocks",()=>{
     if(confirm("Reset everything? 重置所有进度？")){ wipe(); unlocked=[1]; showToast("已重置 · reset done"); showTitle(); }
   }));
+  c.appendChild(menuBtn("关于","ABOUT — version & links",showAbout));
   stage.appendChild(c);
 }
 function showLevels(){
@@ -1253,6 +1309,10 @@ $("#btnSave").onclick=()=>saveGame(false);
 $("#btnHome").onclick=()=>{ if(!S || confirm("Back to title? Unsaved progress is lost.\n回主页？")) showTitle(); };
 ["S","M","L"].forEach(s=>$("#ts"+s).onclick=()=>setTipSize(s));
 setTipSize(recall("hq_tip_size")||"M");
+document.querySelectorAll(".about-link[data-url]").forEach(btn=>btn.onclick=()=>openLink(btn.dataset.url));
+$("#about-backdrop").addEventListener("click",e=>{ if(e.target===$("#about-backdrop")) hideAbout(); });
+$("#about-close").onclick=hideAbout;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") hideAbout(); });
 document.addEventListener("scroll",tipHide,true);
 </script>
 <script>

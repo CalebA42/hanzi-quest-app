@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, shell } = require("electron");
 const path = require("path");
 
 // Single instance — a second launch just focuses the existing window
@@ -19,9 +19,20 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js"),
     },
   });
   Menu.setApplicationMenu(null); // no menu bar; the game is the whole UI
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://")) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (e, url) => {
+    if (!url.startsWith("file://")) {
+      e.preventDefault();
+      if (url.startsWith("https://")) shell.openExternal(url);
+    }
+  });
   win.loadFile("index.html");
 }
 
@@ -41,4 +52,9 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+ipcMain.on("get-version", e => { e.returnValue = app.getVersion(); });
+ipcMain.on("open-external", (_, url) => {
+  if (url.startsWith("https://")) shell.openExternal(url);
 });

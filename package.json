@@ -21,6 +21,7 @@
     "productName": "Hanzi Quest",
     "files": [
       "main.js",
+      "preload.js",
       "index.html",
       "build/icon.png"
     ],
