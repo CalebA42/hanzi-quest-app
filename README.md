@@ -120,3 +120,10 @@ connection; everything is cached after the first success.
 
 New level content or fixes from the developer arrive as an updated `hanzi-quest.html`.
 Just overwrite `index.html` with it and run `npm run build` again.
+
+## Support
+
+Hanzi Quest is free and always will be. If you enjoy it, the most helpful things you can do are:
+
+- **[Buy me a coffee on Ko-fi](https://ko-fi.com/caleba42)** — entirely optional, always appreciated
+- **[Open an issue](../../issues)** — bug reports, feedback, and HSK corrections are just as welcome
