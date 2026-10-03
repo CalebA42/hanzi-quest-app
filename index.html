@@ -58,6 +58,13 @@ body{
 #hearts{color:var(--blood);font-size:14px;letter-spacing:2px}
 #hud .grow{flex:1}
 #hudinv:empty,.hudbreak{display:none}
+/* labels never wrap mid-word; only the item list may */
+#hud{flex-wrap:wrap;row-gap:6px}
+#hud .tag,.hudbtn{white-space:nowrap}
+#hud #hudinv{white-space:normal}
+/* once items are collected they get their own row, so row 1 never squeezes */
+#hud.hasitems .hudbreak{display:block;flex-basis:100%;order:1}
+#hud.hasitems #hudinv{order:2;flex:1}
 .hudbtn{
   font-family:var(--ui);font-size:11px;letter-spacing:1px;
   background:var(--panel);color:var(--paper);
@@ -212,18 +219,20 @@ ruby rt{
 @media (prefers-reduced-motion: reduce){
   .bubble{animation:none}
 }
-@media (max-width:520px){
+@media (max-width:700px){
   /* two-row HUD: level, hearts, SAVE, HOME / items, tooltip size */
-  body{padding-left:6px;padding-right:6px}
-  #hud{flex-wrap:wrap;gap:6px;padding:8px}
-  #hud .tag,.hudbtn{letter-spacing:0}
-  #hearts{letter-spacing:0}
-  .hudbtn{padding:4px 7px;white-space:nowrap}
   #hud.inlevel #hudtitle{display:none}
   #hud .hudbreak{display:block;flex-basis:100%;order:1}
-  #hudinv{order:2;flex:1}
-  #hudinv:empty{display:block}
+  #hud #hudinv{order:2;flex:1}
   #hud .tipsize-group{order:3;margin-left:auto}
+}
+@media (max-width:520px){
+  /* tighter spacing so row 1 fits at 360px with 10 hearts */
+  body{padding-left:6px;padding-right:6px}
+  #hud{gap:6px;padding:8px}
+  #hud .tag,.hudbtn{letter-spacing:0}
+  #hearts{letter-spacing:0}
+  .hudbtn{padding:4px 7px}
   .bubble{font-size:20px;padding-right:70px}
   .choice{font-size:19px}
   #bigtitle{font-size:40px}
@@ -1140,6 +1149,7 @@ function makeChoice(ch,onPick){
 /* ---------------- HUD ---------------- */
 function drawHUD(){
   hud.classList.toggle("inlevel",!!S);
+  hud.classList.toggle("hasitems",!!(S&&S.items.length));
   if(!S){ hudlvl.textContent=""; hudinv.textContent=""; heartsEl.textContent=""; badge.textContent=""; return; }
   const lv=LEVELS[S.level];
   hudlvl.textContent=`LV${S.level} · HSK${lv.hsk}`;
