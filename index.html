@@ -239,7 +239,7 @@ ruby rt{
       <div id="lvlbadge"></div>
     </div>
     <div id="stage"></div>
-    <div class="footer">HOVER A WORD FOR HELP · 拼 = PINYIN · 🔊 = LISTEN</div>
+    <div class="footer">HOVER A WORD FOR HELP · 拼 = PINYIN</div>
   </div>
 </div>
 <div id="tip"><div class="th"></div><div class="tp"></div><div class="te"></div></div>
@@ -1061,39 +1061,6 @@ function saveGame(silent){
 }
 function loadGame(){ try{ const s=JSON.parse(recall("hq_save")); return (s&&LEVELS[s.level]&&LEVELS[s.level].nodes[s.node])?s:null; }catch(e){ return null; } }
 
-/* ---------------- speech ---------------- */
-let zhVoice=null;
-function pickVoice(){
-  const vs=speechSynthesis.getVoices();
-  zhVoice = vs.find(v=>/^zh([-_]CN)?/i.test(v.lang)&&/google/i.test(v.name))
-         || vs.find(v=>/^zh/i.test(v.lang)) || null;
-}
-if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
-let speakingBtn=null;
-function stopSpeech(){
-  if("speechSynthesis" in window) speechSynthesis.cancel();
-  if(speakingBtn){ speakingBtn.classList.remove("on"); speakingBtn=null; }
-}
-function speak(text,rate){
-  if(!("speechSynthesis" in window)){ showToast("no speech voices found"); return; }
-  stopSpeech();
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang="zh-CN"; if(zhVoice)u.voice=zhVoice; u.rate=rate||0.85;
-  speechSynthesis.speak(u);
-}
-/* 🔊 buttons toggle: press once to play, press again to stop mid-sentence */
-function toggleSpeak(btn,text){
-  if(!("speechSynthesis" in window)){ showToast("no speech voices found"); return; }
-  if(speakingBtn===btn){ stopSpeech(); return; }
-  stopSpeech();
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang="zh-CN"; if(zhVoice)u.voice=zhVoice; u.rate=0.85;
-  speakingBtn=btn; btn.classList.add("on");
-  u.onend=u.onerror=()=>{ if(speakingBtn===btn){ btn.classList.remove("on"); speakingBtn=null; } };
-  speechSynthesis.speak(u);
-}
-const lineToText = line => line.map(t=>t.h).join("");
-
 /* ---------------- tooltip ---------------- */
 function tipShow(el,tok){
   tip.querySelector(".th").textContent=tok.h;
@@ -1110,7 +1077,7 @@ function tipShow(el,tok){
 function tipHide(){ tip.style.display="none"; }
 
 /* ---------------- word / line rendering ---------------- */
-function renderLine(line,{speakOnClick=true}={}){
+function renderLine(line,{tipOnClick=true}={}){
   const span=document.createElement("span");
   line.forEach(tok=>{
     if(tok.punct){
@@ -1124,7 +1091,7 @@ function renderLine(line,{speakOnClick=true}={}){
     w.appendChild(ruby);
     w.addEventListener("mouseenter",()=>tipShow(w,tok));
     w.addEventListener("mouseleave",tipHide);
-    if(speakOnClick) w.addEventListener("click",e=>{e.stopPropagation(); tipShow(w,tok); speak(tok.h,0.8);});
+    if(tipOnClick) w.addEventListener("click",e=>{e.stopPropagation(); tipShow(w,tok);});
     span.appendChild(w);
   });
   return span;
@@ -1140,23 +1107,18 @@ function makeBubble(lines,chip){
   const py=document.createElement("button"); py.className="mini"; py.textContent="拼";
   py.title="Toggle pinyin";
   py.onclick=()=>{ b.classList.toggle("show-py"); py.classList.toggle("on"); };
-  const au=document.createElement("button"); au.className="mini"; au.textContent="🔊";
-  au.title="Listen (press again to stop)";
-  au.onclick=()=>toggleSpeak(au,lines.map(lineToText).join("，"));
-  helpers.append(py,au); b.appendChild(helpers);
+  helpers.append(py); b.appendChild(helpers);
   return b;
 }
 function makeChoice(ch,onPick){
   const btn=document.createElement("button");
   btn.className="choice"+(ch.danger?" danger":"");
-  btn.appendChild(renderLine(ch.t,{speakOnClick:false}));
+  btn.appendChild(renderLine(ch.t,{tipOnClick:false}));
   const helpers=document.createElement("div"); helpers.className="helpers";
   const py=document.createElement("button"); py.className="mini"; py.textContent="拼";
   py.onclick=e=>{e.stopPropagation(); btn.classList.toggle("show-py"); py.classList.toggle("on");};
-  const au=document.createElement("button"); au.className="mini"; au.textContent="🔊";
-  au.onclick=e=>{e.stopPropagation(); toggleSpeak(au,lineToText(ch.t));};
-  helpers.append(py,au); btn.appendChild(helpers);
-  btn.style.paddingRight="78px";
+  helpers.append(py); btn.appendChild(helpers);
+  btn.style.paddingRight="44px";
   btn.addEventListener("click",()=>{tipHide(); onPick(ch);});
   return btn;
 }

@@ -9,7 +9,7 @@ An 8-bit Mandarin reading adventure across HSK levels 1–6.
 | Option | Best for |
 |--------|----------|
 | Browser | Quick play, any device, no install |
-| Desktop download | Offline play, better speech synthesis, saves tied to your machine |
+| Desktop download | Offline play, saves tied to your machine |
 
 ### Saves in the browser version
 
@@ -102,15 +102,6 @@ opens the game in a dev window instantly. Useful when iterating on
 Ubuntu 22.04+ doesn't ship libfuse2 by default:
 
     sudo apt install libfuse2
-
-**The 🔊 button is silent.**
-Speech uses the system's voices via speech-dispatcher. Install a Mandarin-
-capable engine:
-
-    sudo apt install speech-dispatcher espeak-ng
-
-then restart the app. (The espeak voice is robotic but serviceable; we can
-bundle recorded audio in a future version if it bothers you.)
 
 **`npm run build` fails downloading Electron.**
 Corporate proxies/firewalls sometimes block the download. Re-run on a normal
