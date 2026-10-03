@@ -1037,7 +1037,7 @@ function setTipSize(k){
   ["S","M","L"].forEach(s=>$("#ts"+s).classList.toggle("on",s===k));
 }
 
-const APP_VERSION = "1.1.1";
+const APP_VERSION = "1.2.0";
 function openLink(url){
   if(window.hanziBridge) window.hanziBridge.openExternal(url);
   else window.open(url,"_blank","noopener,noreferrer");
