@@ -57,6 +57,7 @@ body{
 #hud .tag{color:var(--dim);text-transform:uppercase}
 #hearts{color:var(--blood);font-size:14px;letter-spacing:2px}
 #hud .grow{flex:1}
+#hudinv:empty,.hudbreak{display:none}
 .hudbtn{
   font-family:var(--ui);font-size:11px;letter-spacing:1px;
   background:var(--panel);color:var(--paper);
@@ -212,6 +213,17 @@ ruby rt{
   .bubble{animation:none}
 }
 @media (max-width:520px){
+  /* two-row HUD: level, hearts, SAVE, HOME / items, tooltip size */
+  body{padding-left:6px;padding-right:6px}
+  #hud{flex-wrap:wrap;gap:6px;padding:8px}
+  #hud .tag,.hudbtn{letter-spacing:0}
+  #hearts{letter-spacing:0}
+  .hudbtn{padding:4px 7px;white-space:nowrap}
+  #hud.inlevel #hudtitle{display:none}
+  #hud .hudbreak{display:block;flex-basis:100%;order:1}
+  #hudinv{order:2;flex:1}
+  #hudinv:empty{display:block}
+  #hud .tipsize-group{order:3;margin-left:auto}
   .bubble{font-size:20px;padding-right:70px}
   .choice{font-size:19px}
   #bigtitle{font-size:40px}
@@ -222,10 +234,12 @@ ruby rt{
 <div id="frame">
   <div id="cart">
     <div id="hud">
-      <span class="tag">HANZI·QUEST</span>
+      <span id="hudtitle" class="tag">HANZI·QUEST</span>
       <span id="hudlvl" class="tag"></span>
+      <span id="hudinv" class="tag"></span>
       <span id="hearts"></span>
       <span class="grow"></span>
+      <span class="hudbreak"></span>
       <span class="tipsize-group" title="Tooltip font size">
         <button class="hudbtn" id="tsS">S</button>
         <button class="hudbtn" id="tsM">M</button>
@@ -1016,7 +1030,7 @@ const CT = {
    ENGINE — state, save/load, rendering, combat
    ============================================================ */
 const $ = s=>document.querySelector(s);
-const stage=$("#stage"), hudlvl=$("#hudlvl"), heartsEl=$("#hearts"),
+const stage=$("#stage"), hud=$("#hud"), hudlvl=$("#hudlvl"), hudinv=$("#hudinv"), heartsEl=$("#hearts"),
       badge=$("#lvlbadge"), tip=$("#tip"), toast=$("#toast");
 
 let S = null;            // game state (null = on title screen)
@@ -1125,13 +1139,13 @@ function makeChoice(ch,onPick){
 
 /* ---------------- HUD ---------------- */
 function drawHUD(){
-  if(!S){ hudlvl.textContent=""; heartsEl.textContent=""; badge.textContent=""; return; }
+  hud.classList.toggle("inlevel",!!S);
+  if(!S){ hudlvl.textContent=""; hudinv.textContent=""; heartsEl.textContent=""; badge.textContent=""; return; }
   const lv=LEVELS[S.level];
   hudlvl.textContent=`LV${S.level} · HSK${lv.hsk}`;
   heartsEl.textContent="♥".repeat(S.hp)+"·".repeat(Math.max(0,lv.maxhp-S.hp));
   badge.textContent=`第${["一","二","三","四","五","六"][S.level-1]}关 · ${lv.name}`;
-  const inv=S.items.length?("  ["+S.items.join(" · ")+"]"):"";
-  hudlvl.textContent+=inv;
+  hudinv.textContent=S.items.length?("["+S.items.join(" · ")+"]"):"";
 }
 
 /* ---------------- scenes ---------------- */
