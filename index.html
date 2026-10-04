@@ -61,7 +61,14 @@ body{
 /* labels never wrap mid-word; only the item list may */
 #hud{flex-wrap:wrap;row-gap:6px}
 #hud .tag,.hudbtn{white-space:nowrap}
-#hud #hudinv{white-space:normal}
+/* collected items: one chip each, hover/tap for pinyin + meaning */
+#hudinv{display:flex;flex-wrap:wrap;gap:4px}
+#hudinv .item{
+  font-family:var(--cjk);font-size:16px;line-height:1.3;color:var(--paper);
+  background:var(--panel);border:2px solid var(--stone);border-radius:4px;
+  padding:1px 6px;cursor:help;white-space:nowrap;
+}
+#hudinv .item:hover{border-color:var(--amber)}
 /* once items are collected they get their own row, so row 1 never squeezes */
 #hud.hasitems .hudbreak{display:block;flex-basis:100%;order:1}
 #hud.hasitems #hudinv{order:2;flex:1}
@@ -245,7 +252,7 @@ ruby rt{
     <div id="hud">
       <span id="hudtitle" class="tag">HANZI·QUEST</span>
       <span id="hudlvl" class="tag"></span>
-      <span id="hudinv" class="tag"></span>
+      <span id="hudinv"></span>
       <span id="hearts"></span>
       <span class="grow"></span>
       <span class="hudbreak"></span>
@@ -1155,7 +1162,16 @@ function drawHUD(){
   hudlvl.textContent=`LV${S.level} · HSK${lv.hsk}`;
   heartsEl.textContent="♥".repeat(S.hp)+"·".repeat(Math.max(0,lv.maxhp-S.hp));
   badge.textContent=`第${["一","二","三","四","五","六"][S.level-1]}关 · ${lv.name}`;
-  hudinv.textContent=S.items.length?("["+S.items.join(" · ")+"]"):"";
+  hudinv.replaceChildren(...S.items.map(itemChip));
+}
+
+function itemChip(h){
+  const [p,e]=D[h]||["",""], tok={h,p,e};
+  const c=document.createElement("span"); c.className="item"; c.textContent=h;
+  c.addEventListener("mouseenter",()=>tipShow(c,tok));
+  c.addEventListener("mouseleave",tipHide);
+  c.addEventListener("click",ev=>{ev.stopPropagation(); tipShow(c,tok);});
+  return c;
 }
 
 /* ---------------- scenes ---------------- */
