@@ -205,7 +205,8 @@ ruby rt{
 .menubtn small{display:block;font-family:var(--ui);font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:4px}
 .menubtn:hover:not(:disabled){border-color:var(--amber)}
 .menubtn:active:not(:disabled){transform:translateY(3px);box-shadow:none}
-.menubtn:disabled{opacity:.4;cursor:not-allowed}
+/* locked / unavailable: flat and dashed instead of faded, so text stays readable (≥4.5:1) */
+.menubtn:disabled{background:var(--panel);color:var(--dim);border-style:dashed;box-shadow:none;cursor:not-allowed}
 .lvlcard{width:min(320px,90%)}
 .lock{color:var(--dim)}
 /* combat HP rows */
@@ -221,8 +222,9 @@ ruby rt{
   padding:8px 16px;border-radius:6px;opacity:0;transition:all .25s;z-index:60;
 }
 #toast.show{opacity:1;transform:translateX(-50%)}
-.footer{padding:8px 12px;font-family:var(--ui);font-size:10px;color:#5d5480;
+.footer{padding:8px 12px;font-family:var(--ui);font-size:11px;color:var(--dim);
   letter-spacing:1px;text-align:center}
+.footer span{white-space:nowrap}  /* on narrow screens, wrap only between the two hints */
 @media (prefers-reduced-motion: reduce){
   .bubble{animation:none}
 }
@@ -269,7 +271,7 @@ ruby rt{
       <div id="lvlbadge"></div>
     </div>
     <div id="stage"></div>
-    <div class="footer">HOVER A WORD FOR HELP · 拼 = PINYIN</div>
+    <div class="footer"><span>HOVER OVER OR TAP A WORD FOR HELP</span> · <span>拼 = PINYIN</span></div>
   </div>
 </div>
 <div id="tip"><div class="th"></div><div class="tp"></div><div class="te"></div></div>
