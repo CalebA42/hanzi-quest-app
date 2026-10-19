@@ -332,8 +332,9 @@ const D = {
 "好":["hǎo","good"],"哪儿":["nǎr","where"],"去":["qù","to go"],
 "帮":["bāng","to help"],"可以":["kěyǐ","can / may"],"朋友":["péngyou","friend"],
 "东西":["dōngxi","thing / stuff"],"慢慢地":["mànmàn de","slowly"],
+"上次":["shàngcì","last time"],"存档":["cúndàng","saved game"],"主页":["zhǔyè","home screen"],
 /* ---- level 2 additions (HSK2) ---- */
-"已经":["yǐjīng","already"],"但是":["dànshì","but"],"森林":["sēnlín","forest"],
+"那里":["nàlǐ","there"],"已经":["yǐjīng","already"],"但是":["dànshì","but"],"森林":["sēnlín","forest"],
 "天":["tiān","sky / day"],"开始":["kāishǐ","to begin"],"路":["lù","road / way"],
 "回家":["huí jiā","to go home"],"往":["wǎng","toward"],
 "左边":["zuǒbiān","left side"],"右边":["yòubiān","right side"],
@@ -503,9 +504,11 @@ function L(s){
 /* ============================================================
    LEVEL DATA
    node = { bg, sprite, chip?, text:[lines], choices:[...] }
-   choice = { t:line, next, give?, heal?, req?, missing?, danger? }
+   choice = { t:line, next, give?, heal?, req?, missing?, take?, danger? }
+   (req checks for an item and leaves it; take also uses it up)
    combat node = { combat:{name,sprite,hp,atk}, win, lose, flee }
-   special next targets: "@title", "@level:N", "@restart"
+   special next targets: "@title", "@level:N", "@restart",
+     "@load" (only shown when there is a mid-level save for this level)
    ============================================================ */
 const LEVELS = {
 1:{
@@ -569,7 +572,7 @@ const LEVELS = {
           L("猫|说|：|“|狗|很|喜欢|鱼|！|”")],
     choices:[{t:L("谢谢|！"),next:"c_cat",give:"鱼"}]},
   c_dark:{bg:"dark",sprite:null,
-    text:[L("门|开|了|！|里|很|黑|。"),
+    text:[L("门|开|了|！|里面|很|黑|。"),
           L("你|听见|狗|的|声音|。")],
     choices:[
       {t:L("走|进去"),next:"c_dog",danger:true},
@@ -578,7 +581,7 @@ const LEVELS = {
     text:[L("一只|大|狗|看着|你|！"),
           L("它|前面|有|很多|钱|。")],
     choices:[
-      {t:L("给|它|吃的"),next:"c_fed",req:"鱼",missing:"c_nofish"},
+      {t:L("给|它|吃的"),next:"c_fed",req:"鱼",missing:"c_nofish",take:"鱼"},
       {t:L("打|它|！"),next:"fight_dog",danger:true},
       {t:L("慢慢地|回去"),next:"hall"}]},
   c_nofish:{bg:"dark",sprite:"dog",
@@ -601,13 +604,13 @@ const LEVELS = {
           L("你|很|高兴|！"),
           L("恭喜|！|第一关|完成|了|！")],
     choices:[
-      {t:L("去|第二关|！"),next:"@level:2"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第二关|！"),next:"@level:2"}]},
   gameover:{bg:"dark",sprite:null,
     text:[L("你|太|累|了|……"),L("你|睡觉|了|。")],
     choices:[
       {t:L("再|来|！"),next:"@restart"},
-      {t:L("回去|休息"),next:"@title"}]}
+      {t:L("回到|上次|存档"),next:"@load"},
+      {t:L("回|主页"),next:"@title"}]}
   }
 },
 2:{
@@ -636,7 +639,7 @@ const LEVELS = {
     choices:[{t:L("好吧|……"),next:"f_left"}]},
   f_birdhelp:{bg:"river",sprite:"bird",chip:"鸟",
     text:[L("鸟|说|：|“|右边|有|火|。|火|旁边|有|一个|老人|。|他|知道|路|。"),
-          L("但是|小心|！|那|里|有|狼|！|”")],
+          L("但是|小心|！|那里|有|狼|！|”")],
     choices:[{t:L("谢谢|你|！"),next:"f1"}]},
   f_right:{bg:"camp",sprite:"wolf",
     text:[L("你|看见|火|。|但是|火|旁边|有|一只|大|狼|！"),
@@ -665,13 +668,13 @@ const LEVELS = {
           L("最后|，|你|看见|你|的|家|！|你|很|累|，|但是|你|非常|高兴|。"),
           L("恭喜|！|第二关|完成|了|！")],
     choices:[
-      {t:L("去|第三关|！"),next:"@level:3"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第三关|！"),next:"@level:3"}]},
   gameover2:{bg:"forest",sprite:null,
     text:[L("你|太|累|了|……|你|睡觉|了|。")],
     choices:[
       {t:L("再|来|！"),next:"@restart"},
-      {t:L("回去|休息"),next:"@title"}]}
+      {t:L("回到|上次|存档"),next:"@load"},
+      {t:L("回|主页"),next:"@title"}]}
   }
 },
 3:{
@@ -753,19 +756,18 @@ const LEVELS = {
     text:[L("你|回家|了|。"),
           L("恭喜|！|第三关|完成|了|！")],
     choices:[
-      {t:L("去|第四关|！"),next:"@level:4"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第四关|！"),next:"@level:4"}]},
   win3g:{bg:"outside",sprite:"house",victory:true,
     text:[L("你们|一起|回|了|小城|。|你|有|了|一个|新|朋友|！"),
           L("恭喜|！|第三关|完成|了|！")],
     choices:[
-      {t:L("去|第四关|！"),next:"@level:4"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第四关|！"),next:"@level:4"}]},
   gameover3:{bg:"roof",sprite:null,
     text:[L("你|太|累|了|……|你|睡觉|了|。")],
     choices:[
       {t:L("再|来|！"),next:"@restart"},
-      {t:L("回去|休息"),next:"@title"}]}
+      {t:L("回到|上次|存档"),next:"@load"},
+      {t:L("回|主页"),next:"@title"}]}
   }
 }
 ,
@@ -865,19 +867,18 @@ const LEVELS = {
     text:[L("医生|用|种子|做|了|药|，|还|种|出|了|新|的|花|。|孩子们|都|好|了|！"),
           L("大家|都|感谢|你|。|恭喜|！|第四关|完成|了|！")],
     choices:[
-      {t:L("去|第五关|！"),next:"@level:5"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第五关|！"),next:"@level:5"}]},
   win4f:{bg:"outside",sprite:"flower",victory:true,
     text:[L("医生|用|花|做|了|药|。|孩子们|都|好|了|！"),
           L("恭喜|！|第四关|完成|了|！")],
     choices:[
-      {t:L("去|第五关|！"),next:"@level:5"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第五关|！"),next:"@level:5"}]},
   gameover4:{bg:"dark",sprite:null,
     text:[L("你|太|累|了|……|你|睡觉|了|。")],
     choices:[
       {t:L("再|来|！"),next:"@restart"},
-      {t:L("回去|休息"),next:"@title"}]}
+      {t:L("回到|上次|存档"),next:"@load"},
+      {t:L("回|主页"),next:"@title"}]}
   }
 },
 5:{
@@ -934,8 +935,7 @@ const LEVELS = {
           L("从|那|以后|，|村子|和|雪怪|成|了|朋友|。"),
           L("恭喜|！|第五关|完成|了|！")],
     choices:[
-      {t:L("去|第六关|！"),next:"@level:6"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第六关|！"),next:"@level:6"}]},
   fight_yeti:{combat:{name:L("雪怪"),sprite:"yeti",hp:14,atk:[1,3]},
     win:"v_fwin",lose:"gameover5",flee:"v4"},
   v_fwin:{bg:"snowcave",sprite:"bird",
@@ -947,13 +947,13 @@ const LEVELS = {
     text:[L("村子|安静|了|。|但是|你|常常|想起|山洞|里|哭|的|声音|。"),
           L("恭喜|！|第五关|完成|了|！")],
     choices:[
-      {t:L("去|第六关|！"),next:"@level:6"},
-      {t:L("休息|一下"),next:"@title"}]},
+      {t:L("去|第六关|！"),next:"@level:6"}]},
   gameover5:{bg:"snowcave",sprite:null,
     text:[L("你|太|累|了|……|你|睡觉|了|。")],
     choices:[
       {t:L("再|来|！"),next:"@restart"},
-      {t:L("回去|休息"),next:"@title"}]}
+      {t:L("回到|上次|存档"),next:"@load"},
+      {t:L("回|主页"),next:"@title"}]}
   }
 },
 6:{
@@ -1031,7 +1031,8 @@ const LEVELS = {
     text:[L("你|太|累|了|……|你|睡觉|了|。")],
     choices:[
       {t:L("再|来|！"),next:"@restart"},
-      {t:L("回去|休息"),next:"@title"}]}
+      {t:L("回到|上次|存档"),next:"@load"},
+      {t:L("回|主页"),next:"@title"}]}
   }
 }
 };
@@ -1054,6 +1055,7 @@ const stage=$("#stage"), hud=$("#hud"), hudlvl=$("#hudlvl"), hudinv=$("#hudinv")
 let S = null;            // game state (null = on title screen)
 let unlocked = [1];      // unlocked levels
 let memStore = {};       // fallback if localStorage is blocked
+let savedSnap = null;    // S as of the last save/load, to tell if progress is unsaved
 
 function store(){ try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return localStorage; }catch(e){ return null; } }
 function persist(key,val){ const st=store(); if(st) st.setItem(key,val); else memStore[key]=val; return !!st; }
@@ -1088,10 +1090,16 @@ function saveUnlocked(){ persist("hq_unlocked",JSON.stringify(unlocked)); }
 
 function saveGame(silent){
   if(!S){ showToast("没有游戏 · nothing to save"); return; }
-  const ok = persist("hq_save",JSON.stringify(S));
+  if(S.hp<=0){ showToast("现在不能保存 · can't save after losing"); return; }
+  savedSnap = JSON.stringify(S);
+  const ok = persist("hq_save",savedSnap);
   if(!silent) showToast(ok?"已保存 · saved!":"已保存（仅本次）· saved (this session only)");
 }
+function hasUnsaved(){ return !!S && JSON.stringify(S)!==savedSnap; }
 function loadGame(){ try{ const s=JSON.parse(recall("hq_save")); return (s&&LEVELS[s.level]&&LEVELS[s.level].nodes[s.node])?s:null; }catch(e){ return null; } }
+function resumeSave(){ const s=loadGame(); if(s){S=s; savedSnap=JSON.stringify(S); goNode(S.node);} }
+/* a save partway through the current level (not its victory screen), for the game-over "load last save" choice */
+function hasLevelSave(){ const s=loadGame(); return !!s && !!S && s.level===S.level && !LEVELS[s.level].nodes[s.node].victory; }
 
 /* ---------------- tooltip ---------------- */
 function tipShow(el,tok){
@@ -1180,6 +1188,7 @@ function itemChip(h){
 function goNode(id){
   if(id==="@title") return showTitle();
   if(id==="@restart"){ startLevel(S.level); return; }
+  if(id==="@load") return resumeSave();
   if(id.startsWith("@level:")){ startLevel(parseInt(id.slice(7),10)); return; }
   S.node=id;
   const lv=LEVELS[S.level], node=lv.nodes[id];
@@ -1192,12 +1201,13 @@ function goNode(id){
   stage.innerHTML="";
   stage.appendChild(makeBubble(node.text,node.chip));
   const box=document.createElement("div"); box.id="choices";
-  node.choices.forEach(ch=>box.appendChild(makeChoice(ch,pick)));
+  node.choices.filter(ch=>ch.next!=="@load"||hasLevelSave()).forEach(ch=>box.appendChild(makeChoice(ch,pick)));
   stage.appendChild(box);
   drawHUD();
 }
 function pick(ch){
   if(ch.req && !S.items.includes(ch.req)) return goNode(ch.missing);
+  if(ch.take) S.items=S.items.filter(it=>it!==ch.take);
   if(ch.give && !S.items.includes(ch.give)) S.items.push(ch.give);
   if(ch.heal) S.hp=Math.min(LEVELS[S.level].maxhp,S.hp+ch.heal);
   goNode(ch.next);
@@ -1273,7 +1283,7 @@ function showTitle(){
   const save=loadGame();
   c.appendChild(menuBtn("开始","NEW GAME — pick a level",showLevels));
   c.appendChild(menuBtn("继续", save?("CONTINUE — LV"+save.level+" · "+LEVELS[save.level].name):"CONTINUE — no save found",
-    ()=>{ const s=loadGame(); if(s){S=s; goNode(S.node);} }, !save));
+    resumeSave, !save));
   c.appendChild(menuBtn("重置","RESET — erase save + unlocks",()=>{
     if(confirm("Reset everything? 重置所有进度？")){ wipe(); unlocked=[1]; showToast("已重置 · reset done"); showTitle(); }
   }));
@@ -1310,7 +1320,7 @@ function startLevel(n){
 
 /* HUD buttons */
 $("#btnSave").onclick=()=>saveGame(false);
-$("#btnHome").onclick=()=>{ if(!S || confirm("Back to title? Unsaved progress is lost.\n回主页？")) showTitle(); };
+$("#btnHome").onclick=()=>{ if(!hasUnsaved() || confirm("Back to title? Unsaved progress is lost.\n回主页？")) showTitle(); };
 ["S","M","L"].forEach(s=>$("#ts"+s).onclick=()=>setTipSize(s));
 setTipSize(recall("hq_tip_size")||"M");
 document.querySelectorAll(".about-link[data-url]").forEach(btn=>btn.onclick=()=>openLink(btn.dataset.url));

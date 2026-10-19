@@ -106,8 +106,8 @@ for (const [n, lv] of Object.entries(LEVELS)) {
     for (const l of nd.text || []) { track(l); rows += row(`${n}-${++i}`, "Story", l); }
     for (const c of nd.choices || []) {
       track(c.t);
-      const ctx = [c.req && `Needs item ${c.req}`, c.give && `Player gets ${c.give}`,
-                   c.heal && "Heals the player", c.danger && "Leads to a fight or danger"].filter(Boolean).join(" · ");
+      const ctx = [c.req && `Needs item ${c.req}`, c.take && `Uses up ${c.take}`, c.give && `Player gets ${c.give}`,
+                   c.heal && "Heals the player", c.next === "@load" && "Loads the last save (only shown if there is one)", c.danger && "Leads to a fight or danger"].filter(Boolean).join(" · ");
       rows += row(`${n}-${++i}`, "Option", c.t, ctx);
     }
   }
