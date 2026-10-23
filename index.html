@@ -587,7 +587,7 @@ const LEVELS = {
   c_nofish:{bg:"dark",sprite:"dog",
     text:[L("你|没有|吃的|！"),L("狗|很|生气|！")],
     choices:[{t:L("打|它|！"),next:"fight_dog",danger:true}]},
-  c_fed:{bg:"dark",sprite:"dog",
+  c_fed:{bg:"dark",sprite:"doghappy",
     text:[L("你|给|狗|鱼|。|狗|很|高兴|！"),
           L("你|拿|了|钱|！")],
     choices:[{t:L("很|好|！|走|！"),next:"c_exit",give:"钱"}]},
@@ -1367,14 +1367,27 @@ cat:[
 "...oooooooooO...",
 "...ok.ok..ooO...",
 "................"],
-dog:[
+doghappy:[
 "................",
 "..BBBb..........",
 ".BBBBbb.........",
 ".BkBBbb.......B.",
 "kBBBBbb......B..",
-".pBBrrrBBBBBBB..",
+".pBBBBBBBBBBBB..",
 "...BBBBBBBBBBB..",
+"...BBBBBBBBBBB..",
+"...BBBBBBBBBBB..",
+"...BB.BB..BB.BB.",
+"...BB.BB..BB.BB.",
+"...bb.bb..bb.bb."],
+dog:[
+"..BBBb..........",
+".BBkBbb.........",
+".BkBBbb.........",
+"kBBBBbb.b.b.b...",
+"wkwBBBBBBBBBBBb.",
+"kkkBBBBBBBBBBB.b",
+"wkwBBBBBBBBBBB..",
 "...BBBBBBBBBBB..",
 "...BBBBBBBBBBB..",
 "...BB.BB..BB.BB.",
@@ -1519,7 +1532,7 @@ captain:[
 ".....fkfkf......",
 ".....fffff......",
 "....vvvvvvv.....",
-"...vvvyvyvvv....",
+"...vvvvvvyvv....",
 "...f.vvvvv.f....",
 ".....vvvvv......",
 ".....kk.kk......",
@@ -1642,6 +1655,8 @@ child:[
 ".....kk.kk......",
 ".....bb.bb......"]
 };
+/* objects that sit still; creatures and people bob gently */
+const STILL=new Set(["house","key","coins","bag","flower"]);
 function drawSprite(name,x,y,scale){
   const m=SPR[name]; if(!m) return;
   for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){
@@ -1909,7 +1924,7 @@ function loop(){
   else if(s==="firedoor"){ drawDoors(); }
   else if(s==="torch"){ /* title torches already drawn */ }
   else if(s && SPR[s]){
-    const bob=reduceMotion?0:Math.round(Math.sin(T/18)*2);
+    const bob=(reduceMotion||STILL.has(s))?0:Math.round(Math.sin(T/18)*2);
     const scale = C?7:6;
     const w=SPR[s][0].length*scale;
     drawSprite(s,160-w/2,(C?24:36)+bob,scale);
