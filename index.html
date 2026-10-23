@@ -1714,14 +1714,14 @@ function bgCamp(){
     cx.fillStyle="#141c16"; cx.fillRect(x+12,26,8,80);
     cx.fillStyle="#1a2a1f"; cx.fillRect(x+2,20,28,40); }
   cx.fillStyle="#1d1830"; cx.fillRect(0,106,320,44);
-  /* campfire */
-  cx.fillStyle="#5c4030"; cx.fillRect(140,122,40,6);
+  /* campfire, off to the left so the scene's sprite stands beside it */
+  cx.fillStyle="#5c4030"; cx.fillRect(52,122,40,6);
   const fl=reduceMotion?0.6:(0.5+0.25*Math.sin(T/26));
-  cx.fillStyle="#e8913c"; cx.fillRect(150,110-fl*6,20,14+fl*6);
-  cx.fillStyle="#ffd75e"; cx.fillRect(155,116-fl*4,10,10+fl*4);
-  const g=cx.createRadialGradient(160,118,6,160,118,70);
+  cx.fillStyle="#e8913c"; cx.fillRect(62,110-fl*6,20,14+fl*6);
+  cx.fillStyle="#ffd75e"; cx.fillRect(67,116-fl*4,10,10+fl*4);
+  const g=cx.createRadialGradient(72,118,6,72,118,70);
   g.addColorStop(0,`rgba(255,179,71,${0.25+0.15*fl})`); g.addColorStop(1,"rgba(255,179,71,0)");
-  cx.fillStyle=g; cx.fillRect(90,48,140,120);
+  cx.fillStyle=g; cx.fillRect(2,48,140,102);
 }
 function bgOutside(){
   cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);
