@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, "..");
 const src = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 const blocks = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 // block 0 = dictionary D + L(), block 1 = LEVELS + CT (pure data, no DOM)
-const { D, LEVELS, CT } = vm.runInNewContext(blocks[0] + blocks[1] + ";({D,LEVELS,CT})");
+const { D, L, LEVELS, CT } = vm.runInNewContext(blocks[0] + blocks[1] + ";({D,L,LEVELS,CT})");
 const VERSION = (src.match(/const APP_VERSION = "([^"]+)"/) || [])[1] || "?";
 const TODAY = new Date().toLocaleDateString("en-CA");  // local YYYY-MM-DD
 
@@ -99,9 +99,9 @@ for (const [n, lv] of Object.entries(LEVELS)) {
   const track = line => line.forEach(t => { if (!t.punct && !wordsSeen.has(t.h)) { wordsSeen.add(t.h); newWords.push(t.h); } });
   for (const id of sceneOrder(lv)) {
     const nd = lv.nodes[id];
-    const label = nd.combat ? `Battle: ${zh(nd.combat.name)}` : nd.chip ? `Speaker: ${nd.chip}` : "";
+    const label = nd.combat ? `Battle: ${zh(nd.combat.name)}` : nd.chip ? `Speaker: ${nd.chip.replaceAll("|", "")}` : "";
     rows += `<tr class="scene" bgcolor="#f0f0f0"><td colspan="5">Scene <b>${esc(id)}</b>${label ? " · " + esc(label) : ""}${nd.victory ? " · level complete" : ""}</td></tr>`;
-    if (nd.chip) { track([{ h: nd.chip, ...(D[nd.chip] ? { p: D[nd.chip][0], e: D[nd.chip][1] } : { punct: true }) }]); }
+    if (nd.chip) track(L(nd.chip));
     if (nd.combat) { track(nd.combat.name); rows += row(`${n}-${++i}`, "Enemy", nd.combat.name, "Enemy name shown in battle"); }
     for (const l of nd.text || []) { track(l); rows += row(`${n}-${++i}`, "Story", l); }
     for (const c of nd.choices || []) {

@@ -118,6 +118,8 @@ body{
 .w{cursor:help;border-bottom:1px dotted rgba(154,143,184,.55);transition:background .12s}
 .w:hover{background:rgba(255,179,71,.18);border-bottom-color:var(--amber)}
 .punct{color:var(--dim)}
+/* full-width punctuation followed by more punctuation (！” 。” ：“) uses its half-width form, so no gap opens between them */
+.punct.squeeze{font-feature-settings:"halt"}
 ruby rt{
   font-size:11px;color:var(--amber);opacity:0;letter-spacing:0;
   transition:opacity .15s;font-family:var(--ui);
@@ -125,9 +127,9 @@ ruby rt{
 .show-py ruby rt{opacity:1}
 /* speaker name chip */
 .chip{
-  display:inline-block;font-family:var(--ui);font-size:11px;letter-spacing:1px;
-  color:var(--amber);border:1px solid var(--stone);border-radius:3px;
-  padding:1px 6px;margin-right:8px;vertical-align:middle;background:var(--panel-2);
+  display:inline-block;font-family:var(--cjk);font-size:20px;line-height:1.6;
+  color:var(--amber);border:1px solid var(--stone);border-radius:4px;
+  padding:0 8px;margin-right:10px;background:var(--panel-2);
 }
 /* ---- choices ---- */
 #choices{display:flex;flex-direction:column;gap:8px;margin-top:12px}
@@ -556,21 +558,21 @@ const LEVELS = {
     text:[L("你|看见|一只|小|猫|。"),
           L("猫|说|：|“|你好|！|你|想|要|什么|？|”")],
     choices:[
-      {t:L("我|想|找|钱|！"),next:"c_hint"},
-      {t:L("你|是|谁|？"),next:"c_who"},
-      {t:L("你|有|吃的|吗|？"),next:"c_fish"},
-      {t:L("再见|！"),next:"c1"}]},
+      {t:L("“|我|想|找|钱|！|”"),next:"c_hint"},
+      {t:L("“|你|是|谁|？|”"),next:"c_who"},
+      {t:L("“|你|有|吃的|吗|？|”"),next:"c_fish"},
+      {t:L("“|再见|！|”"),next:"c1"}]},
   c_who:{bg:"cave",sprite:"cat",chip:"猫",
     text:[L("猫|说|：|“|我|是|山洞|的|猫|。|我|叫|小花|。|”")],
-    choices:[{t:L("你好|，|小花|！"),next:"c_cat"}]},
+    choices:[{t:L("“|你好|，|小花|！|”"),next:"c_cat"}]},
   c_hint:{bg:"cave",sprite:"cat",chip:"猫",
     text:[L("猫|说|：|“|大|门|后面|的|老鼠|有|钥匙|。"),
           L("有|钥匙|，|你|能|开|后面|的|门|。|”")],
-    choices:[{t:L("谢谢|你|！"),next:"c1"}]},
+    choices:[{t:L("“|谢谢|你|！|”"),next:"c1"}]},
   c_fish:{bg:"cave",sprite:"cat",chip:"猫",
     text:[L("猫|给|你|一条|鱼|。"),
           L("猫|说|：|“|狗|很|喜欢|鱼|！|”")],
-    choices:[{t:L("谢谢|！"),next:"c_cat",give:"鱼"}]},
+    choices:[{t:L("“|谢谢|！|”"),next:"c_cat",give:"鱼"}]},
   c_dark:{bg:"dark",sprite:null,
     text:[L("门|开|了|！|里面|很|黑|。"),
           L("你|听见|狗|的|声音|。")],
@@ -631,16 +633,16 @@ const LEVELS = {
     text:[L("你|走|到|一条|河|。|水|很|快|，|你|不能|过去|。"),
           L("一只|鸟|说|：|“|你|为什么|在|这儿|？|”")],
     choices:[
-      {t:L("我|想|回家|！"),next:"f_birdhelp"},
-      {t:L("你|会|说话|？|！"),next:"f_birdtalk"},
+      {t:L("“|我|想|回家|！|”"),next:"f_birdhelp"},
+      {t:L("“|你|会|说话|？|！|”"),next:"f_birdtalk"},
       {t:L("回去"),next:"f1"}]},
   f_birdtalk:{bg:"river",sprite:"bird",chip:"鸟",
     text:[L("鸟|笑|了|：|“|因为|这|是|一个|奇怪|的|森林|！|”")],
-    choices:[{t:L("好吧|……"),next:"f_left"}]},
+    choices:[{t:L("“|好吧|……|”"),next:"f_left"}]},
   f_birdhelp:{bg:"river",sprite:"bird",chip:"鸟",
     text:[L("鸟|说|：|“|右边|有|火|。|火|旁边|有|一个|老人|。|他|知道|路|。"),
           L("但是|小心|！|那里|有|狼|！|”")],
-    choices:[{t:L("谢谢|你|！"),next:"f1"}]},
+    choices:[{t:L("“|谢谢|你|！|”"),next:"f1"}]},
   f_right:{bg:"camp",sprite:"wolf",
     text:[L("你|看见|火|。|但是|火|旁边|有|一只|大|狼|！"),
           L("它|的|眼睛|是|红色|的|。")],
@@ -658,11 +660,11 @@ const LEVELS = {
           L("老人|说|：|“|谢谢|你|！|那|只|狼|每天|都|来|。"),
           L("我|带|你|回家|！|”")],
     choices:[
-      {t:L("太|好|了|！"),next:"win2"},
-      {t:L("你|为什么|在|森林|里|？"),next:"f_why"}]},
+      {t:L("“|太|好|了|！|”"),next:"win2"},
+      {t:L("“|你|为什么|在|森林|里|？|”"),next:"f_why"}]},
   f_why:{bg:"camp",sprite:"oldman",chip:"老人",
     text:[L("老人|说|：|“|因为|我|喜欢|安静|。|”")],
-    choices:[{t:L("好吧|！|我们|走|！"),next:"win2"}]},
+    choices:[{t:L("“|好吧|！|我们|走|！|”"),next:"win2"}]},
   win2:{bg:"outside",sprite:"house",victory:true,
     text:[L("你|跟|老人|走|了|很|长|时间|。"),
           L("最后|，|你|看见|你|的|家|！|你|很|累|，|但是|你|非常|高兴|。"),
@@ -693,7 +695,7 @@ const LEVELS = {
   t_neighbor:{bg:"home",sprite:"neighbor",chip:"邻居",
     text:[L("邻居|说|：|“|昨天|晚上|我|听见|了|奇怪|的|声音|。"),
           L("有人|往|城里|跑|了|！|”")],
-    choices:[{t:L("谢谢|！"),next:"t1"}]},
+    choices:[{t:L("“|谢谢|！|”"),next:"t1"}]},
   t2:{bg:"town",sprite:null,
     text:[L("脚印|带|你|到|了|小城|。|街上|人|很多|。"),
           L("你|可以|去|三个|地方|。")],
@@ -701,15 +703,15 @@ const LEVELS = {
       {t:L("去|商店"),next:"t_shop"},
       {t:L("去|图书馆"),next:"t_lib"},
       {t:L("去|公园"),next:"t_park"}]},
-  t_shop:{bg:"town",sprite:"shopkeeper",chip:"商店的人",
+  t_shop:{bg:"town",sprite:"shopkeeper",chip:"商店|的|人",
     text:[L("商店|的|人|说|：|“|今天|早上|有|一个|男人|来|买|东西|。"),
           L("他|看起来|很|害怕|，|往|公园|那边|去|了|。|”")],
-    choices:[{t:L("谢谢|你|！"),next:"t2"}]},
+    choices:[{t:L("“|谢谢|你|！|”"),next:"t2"}]},
   t_lib:{bg:"town",sprite:"girl",chip:"女孩",
     text:[L("图书馆|很|安静|。|一个|女孩|在|看书|。"),
           L("她|说|：|“|我|看见|一个|男人|拿|着|大|包|去|公园|了|。|”")],
-    choices:[{t:L("谢谢|！"),next:"t2"}]},
-  t_park:{bg:"park",sprite:"man",
+    choices:[{t:L("“|谢谢|！|”"),next:"t2"}]},
+  t_park:{bg:"park",sprite:"sleeper",
     text:[L("公园|里|有|很多|树|。"),
           L("一个|男人|在|树|下|睡觉|。|他|旁边|有|一个|包|。")],
     choices:[
@@ -734,20 +736,20 @@ const LEVELS = {
     text:[L("楼上|，|月亮|很|大|。|男人|站|在|你|前面|。"),
           L("他|看起来|很|害怕|。")],
     choices:[
-      {t:L("把|我|的|钱|给|我|！"),next:"fight_thief",danger:true},
-      {t:L("你|为什么|拿|我|的|钱|？"),next:"t_why"}]},
+      {t:L("“|把|我|的|钱|给|我|！|”"),next:"fight_thief",danger:true},
+      {t:L("“|你|为什么|拿|我|的|钱|？|”"),next:"t_why"}]},
   t_why:{bg:"roof",sprite:"man",chip:"男人",
     text:[L("男人|说|：|“|对不起|……"),
           L("因为|我|的|孩子|病|了|，|我|需要|钱|。|”")],
     choices:[
-      {t:L("我|相信|你|。|我|帮助|你|！"),next:"t_help"},
-      {t:L("我|不|相信|你|！"),next:"fight_thief",danger:true}]},
+      {t:L("“|我|相信|你|。|我|帮助|你|！|”"),next:"t_help"},
+      {t:L("“|我|不|相信|你|！|”"),next:"fight_thief",danger:true}]},
   t_help:{bg:"roof",sprite:"man",chip:"男人",
     text:[L("你|给|了|他|一点|钱|。|男人|哭|了|。"),
           L("他|把|钱|还给|你|：|“|谢谢|你|！|我们|是|朋友|！|”")],
-    choices:[{t:L("太|好|了|！"),next:"win3g"}]},
+    choices:[{t:L("“|太|好|了|！|”"),next:"win3g"}]},
   fight_thief:{combat:{name:L("小偷"),sprite:"man",hp:10,atk:[1,2]},
-    win:"t_fwin",lose:"gameover3",flee:"t_park"},
+    win:"t_fwin",lose:"gameover3",flee:"t_roof"},
   t_fwin:{bg:"roof",sprite:"coins",
     text:[L("男人|跑|了|。|你|拿回|了|你|的|钱|。"),
           L("但是|你|觉得|有点|难过|。")],
@@ -779,22 +781,22 @@ const LEVELS = {
           L("医生|说|：|“|只有|海上|小岛|上|的|一种|蓝色|的|花|能|做|药|。"),
           L("但是|海上|很|危险|，|没有|人|愿意|去|。|”")],
     choices:[
-      {t:L("我|愿意|去|！"),next:"d2"},
-      {t:L("为什么|危险|？"),next:"d1b"}]},
+      {t:L("“|我|愿意|去|！|”"),next:"d2"},
+      {t:L("“|为什么|危险|？|”"),next:"d1b"}]},
   d1b:{bg:"home",sprite:"doctor",chip:"医生",
     text:[L("医生|说|：|“|最近|天气|不|好|，|海上|常常|刮|大风|。"),
           L("而且|，|听说|岛|上|有|一条|大|蛇|。|”")],
-    choices:[{t:L("我|不|怕|！|我|去|！"),next:"d2"}]},
+    choices:[{t:L("“|我|不|怕|！|我|去|！|”"),next:"d2"}]},
   d2:{bg:"harbor",sprite:"captain",chip:"船长",
     text:[L("你|到|了|海边|。|一个|船长|站|在|船|旁边|。"),
           L("船长|说|：|“|你|真的|要|去|小岛|？|好吧|，|上|船|！|”")],
     choices:[
       {t:L("上|船|！"),next:"d3"},
-      {t:L("你|去|过|小岛|吗|？"),next:"d2b"}]},
+      {t:L("“|你|去|过|小岛|吗|？|”"),next:"d2b"}]},
   d2b:{bg:"harbor",sprite:"captain",chip:"船长",
     text:[L("船长|说|：|“|去|过|一次|。|我|把|你|送|到|岛|边|，|但是|我|不|上|岛|。"),
           L("那|条|蛇|太|可怕|了|！|”")],
-    choices:[{t:L("好|，|走|吧|！"),next:"d3"}]},
+    choices:[{t:L("“|好|，|走|吧|！|”"),next:"d3"}]},
   d3:{bg:"sea",sprite:null,
     text:[L("船|开|了|。|开始|天气|很|好|。"),
           L("但是|过|了|一会儿|，|天|变|黑|了|，|开始|刮|大风|，|下大雨|！")],
@@ -804,11 +806,11 @@ const LEVELS = {
   d3a:{bg:"sea",sprite:"captain",chip:"船长",
     text:[L("你|和|船长|一起|努力|。|虽然|很|累|，|但是|船|安全|地|经过|了|大风|大雨|。"),
           L("船长|说|：|“|谢谢|你|！|你|真|勇敢|！|”")],
-    choices:[{t:L("我们|到|了|吗|？"),next:"d4"}]},
+    choices:[{t:L("“|我们|到|了|吗|？|”"),next:"d4"}]},
   d3b:{bg:"sea",sprite:null,
     text:[L("你|到|船|里面|去|了|。|船|上上下下|，|你|觉得|很|难受|。"),
           L("最后|，|大风|过去|了|。")],
-    choices:[{t:L("我们|到|了|吗|？"),next:"d4"}]},
+    choices:[{t:L("“|我们|到|了|吗|？|”"),next:"d4"}]},
   d4:{bg:"beach",sprite:null,
     text:[L("你|到|了|小岛|。|岛|上|很|安静|，|只有|鸟|的|声音|。"),
           L("你|看见|山|下|有|一个|洞|。")],
@@ -841,16 +843,16 @@ const LEVELS = {
     text:[L("蛇|醒|了|。|它|说|：|“|又|是|来|拿|花|的|人|！"),
           L("你们|来|了|就|拿|，|从来|不|问|！|”")],
     choices:[
-      {t:L("对不起|。|我|可以|问|你|吗|？"),next:"d8"},
-      {t:L("别|说话|！"),next:"fight_snake",danger:true}]},
+      {t:L("“|对不起|。|我|可以|问|你|吗|？|”"),next:"d8"},
+      {t:L("“|别|说话|！|”"),next:"fight_snake",danger:true}]},
   d8:{bg:"dark",sprite:"snake",chip:"蛇",
     text:[L("蛇|说|：|“|这种|花|一百|年|才|开|一次|。|孩子们|病|了|，|我|也|很|难过|。"),
           L("但是|把|花|拿走|，|花|就|死|了|。|”")],
-    choices:[{t:L("那|怎么办|？"),next:"d9"}]},
+    choices:[{t:L("“|那|怎么办|？|”"),next:"d9"}]},
   d9:{bg:"dark",sprite:"snake",chip:"蛇",
     text:[L("蛇|说|：|“|花|的|种子|也|可以|做|药|。|我|把|种子|给|你|。"),
           L("这样|，|花|不|会|死|，|孩子们|也|能|好|起来|。|”")],
-    choices:[{t:L("谢谢|你|！|你|真|好|！"),next:"d10g",give:"种子"}]},
+    choices:[{t:L("“|谢谢|你|！|你|真|好|！|”"),next:"d10g",give:"种子"}]},
   d10g:{bg:"sea",sprite:"captain",chip:"船长",
     text:[L("船长|看见|你|回来|，|非常|高兴|！|你们|一起|回家|。")],
     choices:[{t:L("走|！"),next:"win4g"}]},
@@ -889,16 +891,16 @@ const LEVELS = {
           L("村长|说|：|“|最近|，|雪山|上|每天|晚上|都|有|可怕|的|声音|，|还有|巨大|的|影子|。"),
           L("大家|都|很|害怕|。|请|你|帮助|我们|！|”")],
     choices:[
-      {t:L("我|马上|上山|！"),next:"v4",req:"衣服",missing:"v_freeze"},
+      {t:L("“|我|马上|上山|！|”"),next:"v4",req:"衣服",missing:"v_freeze"},
       {t:L("先|问问|村里|的|人"),next:"v2"},
       {t:L("先|准备|一下"),next:"v3"}]},
   v2:{bg:"village",sprite:"child",chip:"孩子",
     text:[L("村里|的|孩子|说|：|“|我|不|怕|！"),
           L("我|觉得|那个|声音|听|起来|很|难过|，|不|可怕|。|”")],
-    choices:[{t:L("有|意思|……"),next:"v1"}]},
+    choices:[{t:L("“|有|意思|……|”"),next:"v1"}]},
   v3:{bg:"village",sprite:"oldman",chip:"村长",
     text:[L("村长|给|你|一件|很|厚|的|衣服|：|“|山|上|非常|冷|，|你|一定|要|穿|上|！|”")],
-    choices:[{t:L("谢谢|！"),next:"v1",give:"衣服"}]},
+    choices:[{t:L("“|谢谢|！|”"),next:"v1",give:"衣服"}]},
   v_freeze:{bg:"snowmtn",sprite:null,
     text:[L("山|上|太|冷|了|！|风|像|刀子|一样|！"),
           L("你|不得不|回到|村子|。")],
@@ -924,12 +926,12 @@ const LEVELS = {
     text:[L("雪怪|说|：|“|别人|一|看见|我|就|打|我|……|其实|我|从来|没有|伤害|过|谁|。"),
           L("这|只|小鸟|从|山|上|掉|下来|，|受伤|了|。|我|不|知道|怎么|帮|它|。|”")],
     choices:[
-      {t:L("我|来|帮|小鸟|！"),next:"v7"},
-      {t:L("我|不|相信|你|！"),next:"fight_yeti",danger:true}]},
+      {t:L("“|我|来|帮|小鸟|！|”"),next:"v7"},
+      {t:L("“|我|不|相信|你|！|”"),next:"fight_yeti",danger:true}]},
   v7:{bg:"snowcave",sprite:"bird",
     text:[L("你|小心|地|把|小鸟|放|在|温暖|的|衣服|里|。"),
           L("几|天|以后|，|小鸟|好|了|！|雪怪|非常|高兴|，|它|送|你|和|小鸟|下山|。")],
-    choices:[{t:L("我们|一起|回|村子|！"),next:"win5g"}]},
+    choices:[{t:L("“|我们|一起|回|村子|！|”"),next:"win5g"}]},
   win5g:{bg:"village",sprite:"yeti",victory:true,
     text:[L("村民|看见|雪怪|帮助|你|，|都|不|害怕|了|。"),
           L("从|那|以后|，|村子|和|雪怪|成|了|朋友|。"),
@@ -969,41 +971,41 @@ const LEVELS = {
           L("石人|说|：|“|想|进|庙|，|先|回答|我|三个|问题|。"),
           L("答|错|了|，|就|跟|我|打|！|”")],
     choices:[
-      {t:L("好|！|你|问|吧|！"),next:"r1"},
-      {t:L("我|不|回答|！|打|吧|！"),next:"fight_golem",danger:true}]},
+      {t:L("“|好|！|你|问|吧|！|”"),next:"r1"},
+      {t:L("“|我|不|回答|！|打|吧|！|”"),next:"fight_golem",danger:true}]},
   r1:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("第一个|问题|：|什么|东西|越|洗|越|脏|？")],
     choices:[
-      {t:L("衣服"),next:"r1w"},
-      {t:L("水"),next:"r2"},
-      {t:L("手"),next:"r1w"}]},
+      {t:L("“|衣服|”"),next:"r1w"},
+      {t:L("“|水|”"),next:"r2"},
+      {t:L("“|手|”"),next:"r1w"}]},
   r1w:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("石人|说|：|“|错|了|！|再|想想|。|”")],
     choices:[
-      {t:L("再|来|一次"),next:"r1"},
-      {t:L("别|问|了|！|打|吧|！"),next:"fight_golem",danger:true}]},
+      {t:L("“|再|来|一次|”"),next:"r1"},
+      {t:L("“|别|问|了|！|打|吧|！|”"),next:"fight_golem",danger:true}]},
   r2:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("对|了|！|第二个|问题|：|什么|东西|白天|看|不|见|，|晚上|才|出来|？")],
     choices:[
-      {t:L("太阳"),next:"r2w"},
-      {t:L("鸟"),next:"r2w"},
-      {t:L("星星"),next:"r3"}]},
+      {t:L("“|太阳|”"),next:"r2w"},
+      {t:L("“|鸟|”"),next:"r2w"},
+      {t:L("“|星星|”"),next:"r3"}]},
   r2w:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("石人|说|：|“|错|了|！|再|想想|。|”")],
     choices:[
-      {t:L("再|来|一次"),next:"r2"},
-      {t:L("别|问|了|！|打|吧|！"),next:"fight_golem",danger:true}]},
+      {t:L("“|再|来|一次|”"),next:"r2"},
+      {t:L("“|别|问|了|！|打|吧|！|”"),next:"fight_golem",danger:true}]},
   r3:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("对|了|！|最后|一个|问题|：|什么|东西|是|你|的|，|但是|别人|用|得|比|你|多|？")],
     choices:[
-      {t:L("你|的|钱"),next:"r3w"},
-      {t:L("你|的|名字"),next:"g3"},
-      {t:L("你|的|家"),next:"r3w"}]},
+      {t:L("“|你|的|钱|”"),next:"r3w"},
+      {t:L("“|你|的|名字|”"),next:"g3"},
+      {t:L("“|你|的|家|”"),next:"r3w"}]},
   r3w:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("石人|说|：|“|错|了|！|再|想想|。|”")],
     choices:[
-      {t:L("再|来|一次"),next:"r3"},
-      {t:L("别|问|了|！|打|吧|！"),next:"fight_golem",danger:true}]},
+      {t:L("“|再|来|一次|”"),next:"r3"},
+      {t:L("“|别|问|了|！|打|吧|！|”"),next:"fight_golem",danger:true}]},
   g3:{bg:"temple",sprite:"golem",chip:"石人",
     text:[L("石人|笑|了|：|“|你|很|有|智慧|！|请|进|吧|。|”"),
           L("庙|门|慢慢地|开|了|。")],
@@ -1119,10 +1121,10 @@ function tipHide(){ tip.style.display="none"; }
 /* ---------------- word / line rendering ---------------- */
 function renderLine(line,{tipOnClick=true}={}){
   const span=document.createElement("span");
-  line.forEach(tok=>{
+  line.forEach((tok,i)=>{
     if(tok.punct){
       const p=document.createElement("span");
-      p.className="punct"; p.textContent=tok.h; span.appendChild(p); return;
+      p.className="punct"+(line[i+1]&&line[i+1].punct?" squeeze":""); p.textContent=tok.h; span.appendChild(p); return;
     }
     const w=document.createElement("span"); w.className="w";
     const ruby=document.createElement("ruby");
@@ -1138,7 +1140,7 @@ function renderLine(line,{tipOnClick=true}={}){
 }
 function makeBubble(lines,chip){
   const b=document.createElement("div"); b.className="bubble";
-  if(chip){ const c=document.createElement("span"); c.className="chip"; c.textContent=chip; b.appendChild(c); }
+  if(chip){ const c=document.createElement("span"); c.className="chip"; c.appendChild(renderLine(L(chip))); b.appendChild(c); }
   lines.forEach((line,i)=>{
     b.appendChild(renderLine(line));
     if(i<lines.length-1) b.appendChild(document.createElement("br"));
@@ -1511,6 +1513,19 @@ man:[
 ".....kkkkk......",
 ".....kk.kk......",
 ".....bb.bb......"],
+sleeper:[
+".......wwwww..................",
+"..........w...................",
+".........w....................",
+".wwww...w.....................",
+"...w...wwwww..................",
+"..w...........................",
+".wwww...................bb....",
+".......................b..b...",
+"...f..................BBBBBB..",
+"ddfff.GGGGGGG.......bBBBBBBBB.",
+"ddkkf.GGGfGGGkkkkkb.BByybBBBB.",
+"dfffffGGGGGGGkkkkkb.BBBBBBBBB."],
 bag:[
 "................",
 "................",
@@ -1656,7 +1671,9 @@ child:[
 ".....bb.bb......"]
 };
 /* objects that sit still; creatures and people bob gently */
-const STILL=new Set(["house","key","coins","bag","flower"]);
+const STILL=new Set(["house","key","coins","bag","flower","sleeper"]);
+/* sprites that stand on the ground: y (canvas px) their lowest drawn row rests on */
+const GROUNDED={house:120,sleeper:124};
 function drawSprite(name,x,y,scale){
   const m=SPR[name]; if(!m) return;
   for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){
@@ -1927,7 +1944,9 @@ function loop(){
     const bob=(reduceMotion||STILL.has(s))?0:Math.round(Math.sin(T/18)*2);
     const scale = C?7:6;
     const w=SPR[s][0].length*scale;
-    drawSprite(s,160-w/2,(C?24:36)+bob,scale);
+    let y=(C?24:36)+bob;
+    if(GROUNDED[s]){ const rows=SPR[s].findLastIndex(r=>/[^.]/.test(r))+1; y=GROUNDED[s]-rows*scale; }
+    drawSprite(s,160-w/2,y,scale);
   }
   cx.restore();
   if(flash){ cx.fillStyle=flash; cx.fillRect(0,0,320,150); flash=null; }
