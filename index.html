@@ -227,6 +227,10 @@ ruby rt{
 .footer{padding:8px 12px;font-family:var(--ui);font-size:11px;color:var(--dim);
   letter-spacing:1px;text-align:center}
 .footer span{white-space:nowrap}  /* on narrow screens, wrap only between the two hints */
+/* touch screens: a long press shows the tooltip without selecting text or opening the copy menu */
+@media (hover:none){
+  .bubble,.choice,.item{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+}
 @media (prefers-reduced-motion: reduce){
   .bubble{animation:none}
 }
@@ -1119,7 +1123,9 @@ function tipShow(el,tok){
 function tipHide(){ tip.style.display="none"; }
 
 /* ---------------- word / line rendering ---------------- */
-function renderLine(line,{tipOnClick=true}={}){
+/* tipOn: "click" shows the tooltip on any click or tap; "tap" only on touch/pen,
+   so a mouse click on a word inside a choice still picks the choice */
+function renderLine(line,{tipOn="click"}={}){
   const span=document.createElement("span");
   line.forEach((tok,i)=>{
     if(tok.punct){
@@ -1133,7 +1139,12 @@ function renderLine(line,{tipOnClick=true}={}){
     w.appendChild(ruby);
     w.addEventListener("mouseenter",()=>tipShow(w,tok));
     w.addEventListener("mouseleave",tipHide);
-    if(tipOnClick) w.addEventListener("click",e=>{e.stopPropagation(); tipShow(w,tok);});
+    let touch=false;
+    w.addEventListener("pointerdown",e=>{touch=e.pointerType!=="mouse";});
+    w.addEventListener("click",e=>{
+      if(tipOn==="tap" && !touch) return;
+      e.stopPropagation(); tipShow(w,tok);
+    });
     span.appendChild(w);
   });
   return span;
@@ -1155,7 +1166,7 @@ function makeBubble(lines,chip){
 function makeChoice(ch,onPick){
   const btn=document.createElement("button");
   btn.className="choice"+(ch.danger?" danger":"");
-  btn.appendChild(renderLine(ch.t,{tipOnClick:false}));
+  btn.appendChild(renderLine(ch.t,{tipOn:"tap"}));
   const helpers=document.createElement("div"); helpers.className="helpers";
   const py=document.createElement("button"); py.className="mini"; py.textContent="拼";
   py.onclick=e=>{e.stopPropagation(); btn.classList.toggle("show-py"); py.classList.toggle("on");};
@@ -1330,6 +1341,8 @@ $("#about-backdrop").addEventListener("click",e=>{ if(e.target===$("#about-backd
 $("#about-close").onclick=hideAbout;
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") hideAbout(); });
 document.addEventListener("scroll",tipHide,true);
+/* touch screens have no mouseleave: tapping anywhere but a word or item closes the tooltip */
+document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".w,.item")) tipHide(); });
 </script>
 <script>
 /* ============================================================
