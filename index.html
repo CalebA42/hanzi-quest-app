@@ -31,6 +31,7 @@
   --py:"DejaVu Sans Mono","Menlo","Consolas","HQ Pinyin","Courier New",monospace;
   --tip-py-size:16px;
   --tip-en-size:14px;
+  --text-scale:1;         /* story text size, from the S/M/L picker */
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -103,7 +104,7 @@ body{
   border-radius:8px;
   padding:12px 78px 12px 14px;
   margin:0 0 10px;
-  font-size:23px;line-height:2.05;
+  font-size:calc(23px*var(--text-scale));line-height:2.05;
   animation:pop .18s ease-out;
 }
 .bubble.sys{font-family:var(--ui);font-size:12px;color:var(--dim);
@@ -128,19 +129,21 @@ body{
 /* hidden pinyin is display:none, not transparent: a wide annotation (chuánzhǎng) would still stretch the hanzi apart */
 ruby rt{
   display:none;
-  font-size:11px;color:var(--amber);letter-spacing:0;font-family:var(--py);
+  font-size:calc(11px*var(--text-scale));color:var(--amber);letter-spacing:0;font-family:var(--py);
 }
 .show-py ruby rt{display:revert}
+/* with pinyin shown, a small gap keeps neighbouring words' pinyin from running together */
+.show-py .w{margin:0 .12em}
 /* speaker name chip */
 .chip{
-  display:inline-block;font-family:var(--cjk);font-size:20px;line-height:1.6;
+  display:inline-block;font-family:var(--cjk);font-size:calc(20px*var(--text-scale));line-height:1.6;
   color:var(--amber);border:1px solid var(--stone);border-radius:4px;
   padding:0 8px;margin-right:10px;background:var(--panel-2);
 }
 /* ---- choices ---- */
 #choices{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .choice{
-  text-align:left;font-family:var(--cjk);font-size:21px;line-height:1.9;
+  text-align:left;font-family:var(--cjk);font-size:calc(21px*var(--text-scale));line-height:1.9;
   background:var(--panel-2);color:var(--paper);
   border:2px solid var(--stone);border-radius:8px;
   padding:9px 14px 9px 40px;cursor:pointer;position:relative;
@@ -241,7 +244,7 @@ ruby rt{
   .bubble{animation:none}
 }
 @media (max-width:700px){
-  /* two-row HUD: level, hearts, SAVE, HOME / items, tooltip size */
+  /* two-row HUD: level, hearts, SAVE, HOME / items, text size */
   #hud.inlevel #hudtitle{display:none}
   #hud .hudbreak{display:block;flex-basis:100%;order:1}
   #hud #hudinv{order:2;flex:1}
@@ -254,8 +257,8 @@ ruby rt{
   #hud .tag,.hudbtn{letter-spacing:0}
   #hearts{letter-spacing:0}
   .hudbtn{padding:4px 7px}
-  .bubble{font-size:20px;padding-right:70px}
-  .choice{font-size:19px}
+  .bubble{font-size:calc(20px*var(--text-scale));padding-right:70px}
+  .choice{font-size:calc(19px*var(--text-scale))}
   #bigtitle{font-size:40px}
 }
 </style>
@@ -270,7 +273,7 @@ ruby rt{
       <span id="hearts"></span>
       <span class="grow"></span>
       <span class="hudbreak"></span>
-      <span class="tipsize-group" title="Tooltip font size">
+      <span class="tipsize-group" title="Text size">
         <button class="hudbtn" id="tsS">S</button>
         <button class="hudbtn" id="tsM">M</button>
         <button class="hudbtn" id="tsL">L</button>
@@ -1074,9 +1077,11 @@ function persist(key,val){ const st=store(); if(st) st.setItem(key,val); else me
 function recall(key){ const st=store(); return st ? st.getItem(key) : (memStore[key]??null); }
 function wipe(){ const st=store(); if(st){st.removeItem("hq_save");st.removeItem("hq_unlocked");} memStore={}; }
 
-const TIP_SIZES={S:[13,12],M:[16,14],L:[20,17]};
-function setTipSize(k){
-  const [py,en]=TIP_SIZES[k]||TIP_SIZES.M;
+/* S/M/L: [story text scale, tooltip pinyin px, tooltip English px]; saved as hq_tip_size from when it only sized tooltips */
+const TEXT_SIZES={S:[0.85,13,12],M:[1,16,14],L:[1.25,20,17]};
+function setTextSize(k){
+  const [scale,py,en]=TEXT_SIZES[k]||TEXT_SIZES.M;
+  document.documentElement.style.setProperty("--text-scale",scale);
   document.documentElement.style.setProperty("--tip-py-size",py+"px");
   document.documentElement.style.setProperty("--tip-en-size",en+"px");
   persist("hq_tip_size",k);
@@ -1340,8 +1345,8 @@ function startLevel(n){
 /* HUD buttons */
 $("#btnSave").onclick=()=>saveGame(false);
 $("#btnHome").onclick=()=>{ if(!hasUnsaved() || confirm("Back to title? Unsaved progress is lost.\n回主页？")) showTitle(); };
-["S","M","L"].forEach(s=>$("#ts"+s).onclick=()=>setTipSize(s));
-setTipSize(recall("hq_tip_size")||"M");
+["S","M","L"].forEach(s=>$("#ts"+s).onclick=()=>setTextSize(s));
+setTextSize(recall("hq_tip_size")||"M");
 document.querySelectorAll(".about-link[data-url]").forEach(btn=>btn.onclick=()=>openLink(btn.dataset.url));
 $("#about-backdrop").addEventListener("click",e=>{ if(e.target===$("#about-backdrop")) hideAbout(); });
 $("#about-close").onclick=hideAbout;
