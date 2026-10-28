@@ -125,11 +125,12 @@ body{
 .punct{color:var(--dim)}
 /* full-width punctuation followed by more punctuation (！” 。” ：“) uses its half-width form, so no gap opens between them */
 .punct.squeeze{font-feature-settings:"halt"}
+/* hidden pinyin is display:none, not transparent: a wide annotation (chuánzhǎng) would still stretch the hanzi apart */
 ruby rt{
-  font-size:11px;color:var(--amber);opacity:0;letter-spacing:0;
-  transition:opacity .15s;font-family:var(--py);
+  display:none;
+  font-size:11px;color:var(--amber);letter-spacing:0;font-family:var(--py);
 }
-.show-py ruby rt{opacity:1}
+.show-py ruby rt{display:revert}
 /* speaker name chip */
 .chip{
   display:inline-block;font-family:var(--cjk);font-size:20px;line-height:1.6;
