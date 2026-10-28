@@ -1088,7 +1088,7 @@ function setTextSize(k){
   ["S","M","L"].forEach(s=>$("#ts"+s).classList.toggle("on",s===k));
 }
 
-const APP_VERSION = "1.3.7";
+const APP_VERSION = "1.3.8";
 function openLink(url){
   if(window.hanziBridge) window.hanziBridge.openExternal(url);
   else window.open(url,"_blank","noopener,noreferrer");
