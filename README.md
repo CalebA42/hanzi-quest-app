@@ -75,8 +75,10 @@ Copy that single file to any Linux machine — that's the whole app.
 
 ### Automated releases (GitHub Actions)
 
-Pushing a version tag builds both platforms and attaches the artifacts to a
-GitHub Release automatically:
+Pushing a version tag builds both platforms and, once both builds pass,
+publishes a GitHub Release with the files attached. Each release needs notes
+in `release-notes/vX.Y.Z.md` (see [release-notes/README.md](release-notes/README.md)),
+committed before the tag; without them the workflow stops before building.
 
     git tag v1.1.0
     git push origin v1.1.0
