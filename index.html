@@ -862,7 +862,7 @@ const LEVELS = {
     text:[L("蛇|说|：|“|这种|花|一百|年|才|开|一次|。|孩子们|病|了|，|我|也|很|难过|。"),
           L("但是|把|花|拿走|，|花|就|死|了|。|”")],
     choices:[{t:L("“|那|怎么办|？|”"),next:"d9"}]},
-  d9:{bg:"dark",sprite:"snake",chip:"蛇",
+  d9:{bg:"dark",sprite:"seed",chip:"蛇",
     text:[L("蛇|说|：|“|花|的|种子|也|可以|做|药|。|我|把|种子|给|你|。"),
           L("这样|，|花|不|会|死|，|孩子们|也|能|好|起来|。|”")],
     choices:[{t:L("“|谢谢|你|！|你|真|好|！|”"),next:"d10g",give:"种子"}]},
@@ -878,7 +878,7 @@ const LEVELS = {
   d10f2:{bg:"sea",sprite:"captain",chip:"船长",
     text:[L("船长|看见|你|回来|，|非常|高兴|！|你们|一起|回家|。")],
     choices:[{t:L("走|！"),next:"win4f"}]},
-  win4g:{bg:"outside",sprite:"flower",victory:true,
+  win4g:{bg:"outside",sprite:"sprout",victory:true,
     text:[L("医生|用|种子|做|了|药|，|还|种|出|了|新|的|花|。|孩子们|都|好|了|！"),
           L("大家|都|感谢|你|。|恭喜|！|第四关|完成|了|！")],
     choices:[
@@ -1365,7 +1365,7 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const PAL={g:"#8a8a9e",G:"#5c5c70",p:"#e8a0b4",k:"#1a1626",o:"#e8913c",
   O:"#b4632a",w:"#f2e9d8",b:"#3d2b1f",B:"#5c4030",y:"#ffd75e",Y:"#c9a227",
   r:"#e0566b",d:"#3a3154",D:"#2b2344",e:"#7ee08a",E:"#3f7a44",s:"#7ec8e8",
-  t:"#6b4f35",n:"#2e4632",x:"#c9c2d8",f:"#d9a066",v:"#2f4a80"};
+  t:"#6b4f35",n:"#2e4632",x:"#c9c2d8",f:"#d9a066",v:"#2f4a80",l:"#4f8fd6"};
 const SPR={
 rat:[
 "................",
@@ -1604,16 +1604,42 @@ snake:[
 "................"],
 flower:[
 "................",
-"................",
-"......ss........",
-".....ssss.......",
-"....ssyyss......",
-".....ssss.......",
-"......ee........",
+"......vv........",
+".....vllv.......",
+"....vllllv......",
+"...vllyyllv.....",
+"....vllllv......",
+".....vvvv.......",
 "......ee........",
 ".....eeee.......",
 "......ee........",
+"......ee........",
+"................"],
+seed:[
 "................",
+"................",
+"................",
+".....OO.........",
+"....OffO........",
+"...OfwffO.......",
+"...OffffO..OO...",
+"...OffffO.OffO..",
+"....OffO..OffO..",
+".....OO....OO...",
+"................",
+"................"],
+sprout:[
+"................",
+"................",
+".......vv.......",
+"......vllv......",
+".......EE.......",
+"...EE..EE..EE...",
+"..EeeE.EE.EeeE..",
+"...EeeEEEEeeE...",
+".......EE.......",
+".....BBBBBB.....",
+"....BBbBBbBB....",
 "................"],
 yeti:[
 "................",
@@ -1623,7 +1649,7 @@ yeti:[
 "..xxxxxxxxxxx...",
 "..xxxkkkxxxxx...",
 ".xxxxxxxxxxxxx..",
-".xxx.xxxxx.xxx..",
+".xxxxxxxxxxxxx..",
 ".xxxxxxxxxxxxx..",
 "..xxx.....xxx...",
 "..xxx.....xxx...",
@@ -1695,9 +1721,9 @@ child:[
 ".....bb.bb......"]
 };
 /* objects that sit still; creatures and people bob gently */
-const STILL=new Set(["house","key","coins","bag","flower","sleeper"]);
+const STILL=new Set(["house","key","coins","bag","flower","sleeper","seed","sprout"]);
 /* sprites that stand on the ground: y (canvas px) their lowest drawn row rests on */
-const GROUNDED={house:120,sleeper:124};
+const GROUNDED={house:120,sleeper:124,sprout:124};
 function drawSprite(name,x,y,scale){
   const m=SPR[name]; if(!m) return;
   for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){
@@ -1830,7 +1856,7 @@ function bgHarbor(){
   cx.fillStyle="#6b4f35"; cx.fillRect(258,20,4,42);          /* mast */
   cx.fillStyle="#f2e9d8"; cx.fillRect(262,24,22,26);         /* sail */
 }
-function bgSea(){
+function bgSea(captain){
   cx.fillStyle="#5c7a94"; cx.fillRect(0,0,320,150);          /* stormy sky */
   cx.fillStyle="#8a8a9e";
   for(let i=0;i<5;i++) cx.fillRect(20+i*62,18+(i%2)*14,44,10); /* clouds */
@@ -1839,6 +1865,7 @@ function bgSea(){
   for(let i=0;i<16;i++){ const off=reduceMotion?0:Math.floor(T/5);
     cx.fillRect(((i*27+off)%336)-8,98+(i%5)*10,18,3); }
   const rock=reduceMotion?0:Math.round(Math.sin(T/16)*3);   /* boat rocks */
+  if(captain) drawSprite("captain",118,42+rock,3);          /* on deck, legs behind the hull */
   cx.fillStyle="#5c4030"; cx.fillRect(126,72+rock,68,24);
   cx.fillStyle="#6b4f35"; cx.fillRect(156,34+rock,4,40);
   cx.fillStyle="#f2e9d8"; cx.fillRect(160,38+rock,26,28);
@@ -1945,7 +1972,7 @@ function loop(){
   else if(b==="park") bgPark();
   else if(b==="roof") bgRoof();
   else if(b==="harbor") bgHarbor();
-  else if(b==="sea") bgSea();
+  else if(b==="sea") bgSea(scene.sprite==="captain");
   else if(b==="beach") bgBeach();
   else if(b==="village") bgVillage();
   else if(b==="snowmtn") bgSnowmtn();
@@ -1964,6 +1991,7 @@ function loop(){
   else if(s==="backdoor") drawBackdoor();
   else if(s==="firedoor"){ drawDoors(); }
   else if(s==="torch"){ /* title torches already drawn */ }
+  else if(s==="captain" && b==="sea"){ /* drawn aboard the boat by bgSea */ }
   else if(s && SPR[s]){
     const bob=(reduceMotion||STILL.has(s))?0:Math.round(Math.sin(T/18)*2);
     const scale = C?7:6;
