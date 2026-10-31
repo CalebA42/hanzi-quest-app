@@ -1362,63 +1362,719 @@ document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".w,.item")) t
    ============================================================ */
 const cv=$("#view"), cx=cv.getContext("2d");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const PAL={g:"#8a8a9e",G:"#5c5c70",p:"#e8a0b4",k:"#1a1626",o:"#e8913c",
+cx.imageSmoothingEnabled=false;
+
+/* ---- v2 master palette: every scene color, sprites and backgrounds alike ----
+   ramps run dark -> light; shadows lean blue/purple, highlights lean yellow */
+const PAL={
+  k:"#120c1a",                                                    /* outline */
+  1:"#1a1530",2:"#261f42",3:"#352d58",4:"#4a4274",5:"#655d92",6:"#8a83b4", /* stone */
+  7:"#5e3a5c",8:"#94606e",                                        /* firelit stone */
+  b:"#3b2420",B:"#5e3a2c",t:"#87553a",f:"#b8804f",c:"#e0b27a",   /* earth, wood, fur */
+  O:"#9c3f26",o:"#e07a2e",y:"#ffcf4a",Y:"#b88a24",L:"#fff4b0",   /* fire, gold, light */
+  R:"#7a2238",r:"#d6455a",p:"#f29aa8",                            /* red, pink */
+  N:"#14302a",n:"#1f5a3c",E:"#3a8a3e",e:"#8ad45a",                /* green */
+  V:"#1a2550",v:"#284a8c",l:"#3f86d4",s:"#8ccff0",a:"#2fa39a",    /* blue, teal */
+  g:"#9a98ab",x:"#cfcadb",w:"#f6f1e4"                             /* grey, white */
+};
+const PK=Object.keys(PAL), CI={};          /* char <-> buffer index (0 = transparent) */
+PK.forEach((k,i)=>CI[k]=i+1);
+const RGB=[null,...PK.map(k=>[1,3,5].map(i=>parseInt(PAL[k].slice(i,i+2),16)))];
+
+/* ---- indexed pixel buffers: art is drawn here once, then cached as a canvas ---- */
+function px(w,h){ return {w,h,d:new Uint8Array(w*h)}; }
+function at(p,x,y){ return (x<0||y<0||x>=p.w||y>=p.h)?0:p.d[y*p.w+x]; }
+function rect(p,x,y,w,h,c,ph){            /* ph 0/1: checkerboard dither only */
+  const v=CI[c];
+  for(let j=Math.max(0,y);j<Math.min(p.h,y+h);j++)
+    for(let i=Math.max(0,x);i<Math.min(p.w,x+w);i++)
+      if(ph===undefined||((i+j)&1)===ph) p.d[j*p.w+i]=v;
+}
+function stamp(p,m,x,y){                   /* char map onto buffer; '.' = transparent */
+  for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){
+    const ch=m[r][c], i=x+c, j=y+r;
+    if(ch!=="."&&i>=0&&j>=0&&i<p.w&&j<p.h) p.d[j*p.w+i]=CI[ch];
+  }
+}
+function blit(p,q,x,y){                    /* buffer onto buffer */
+  for(let j=0;j<q.h;j++)for(let i=0;i<q.w;i++){
+    const v=q.d[j*q.w+i]; if(v&&x+i>=0&&y+j>=0&&x+i<p.w&&y+j<p.h) p.d[(y+j)*p.w+x+i]=v;
+  }
+}
+/* recolor through a ramp map ({from:to}); ph 0/1 limits it to a checkerboard */
+function shift(p,x,y,w,h,map,ph){
+  for(let j=Math.max(0,y);j<Math.min(p.h,y+h);j++)
+    for(let i=Math.max(0,x);i<Math.min(p.w,x+w);i++){
+      if(ph!==undefined&&((i+j)&1)!==ph) continue;
+      const k=j*p.w+i, to=map[PK[p.d[k]-1]]; if(to) p.d[k]=CI[to];
+    }
+}
+/* one step lighter/darker along each ramp; light warms toward yellow */
+const LIT={k:"1",1:"2",2:"3",3:"4",4:"5",5:"6",6:"x",x:"w",b:"B",B:"t",t:"f",f:"c",c:"L",
+  O:"o",o:"y",y:"L",Y:"y",R:"r",r:"p",N:"n",n:"E",E:"e",V:"v",v:"l",l:"s",g:"x"};
+const WARM={2:"7",3:"7",4:"8",5:"8",6:"c",x:"c",7:"8",8:"c"};
+const DIM=Object.fromEntries(Object.entries(LIT).filter(([a,b])=>a!=="k").map(([a,b])=>[b,a]));
+/* dithered pool of light: full steps inside, a checkerboard band at each edge */
+function glow(p,lx,ly,r,steps,warm){
+  for(let j=Math.max(0,ly-r);j<Math.min(p.h,ly+r);j++)
+    for(let i=Math.max(0,lx-r);i<Math.min(p.w,lx+r);i++){
+      const d=Math.hypot(i-lx,(j-ly)*1.15)/r; if(d>=1) continue;
+      const v=(1-d)*steps; let n=Math.floor(v);
+      if(v-n>0.6||(v-n>0.4&&((i+j)&1))) n++;
+      for(let s=0;s<n;s++){
+        const k=j*p.w+i, ch=PK[p.d[k]-1], to=(warm&&s===n-1&&n===steps&&WARM[ch])||LIT[ch];
+        if(to) p.d[k]=CI[to];
+      }
+    }
+}
+/* 1px outline around everything opaque (sprites get this automatically) */
+function outline(p,c){
+  const q=px(p.w+2,p.h+2), v=CI[c||"k"];
+  blit(q,p,1,1);
+  for(let j=0;j<q.h;j++)for(let i=0;i<q.w;i++)     /* q(i,j) sits over p(i-1,j-1) */
+    if(!q.d[j*q.w+i]&&(at(p,i-1,j-2)||at(p,i-1,j)||at(p,i-2,j-1)||at(p,i,j-1))) q.d[j*q.w+i]=v;
+  return q;
+}
+function silhouette(p,c){ const q=px(p.w,p.h),v=CI[c]; for(let k=0;k<p.d.length;k++) if(p.d[k]) q.d[k]=v; return q; }
+function toCanvas(p){
+  const c=document.createElement("canvas"); c.width=p.w; c.height=p.h;
+  const g=c.getContext("2d"), im=g.createImageData(p.w,p.h);
+  for(let k=0;k<p.d.length;k++){ const v=RGB[p.d[k]]; if(!v) continue;
+    im.data.set(v,k*4); im.data[k*4+3]=255; }
+  g.putImageData(im,0,0); return c;
+}
+
+/* ---- v2 sprites: 1 art pixel = 1 canvas pixel; outlines are added automatically
+   base  = still frame (also used when reduce-motion is on)
+   anim  = idle loop, each frame a patch over base ({} = base): {row:[col,"run"]}
+           overwrites that row from col on with run
+   hit   = combat hit-reaction patch
+   rate  = ticks (1/60 s) per idle frame, or a list with one hold time per frame
+   float = presented in mid-air (items) instead of standing on the ground line
+   NAME_fight = larger art used in combat, if the enemy has it */
+const SPR={
+rat:{rate:[150,70,150,12],
+base:[
+".................BBppBB.....................................",
+"................BppppppB....................................",
+"...............BpppppppBB...................................",
+"...............BppppppppB...................................",
+"...............BppppppppB...................................",
+"...............BppppppppB...................................",
+"...............BppppppppB...tttttttttB......................",
+"...............BBpppppRBBtttttttttttttttB...................",
+"..........ttttttBBpppRBBttttttttttttttttttB.................",
+"........tttttttttBBBBBBfffffffffffftttttttttB...............",
+"......ttffffffffttttttfffffffffffffffttttttttB..............",
+".....tfffffffffffftttttfffffffffffffffttttttttB.............",
+"....ttfffwkkffffffttttttffffffffffffffttttttttBB............",
+"....ttfffkkkffffffttttttfffffffffffffttttttttttBB..ppppp....",
+"...tttfffkkkfffffftttttttffffffffffttttttttttttBB.ppppppp...",
+"...ttffffffffffftttttttttttttttttttttttttttttttBBBpRRRRpp...",
+"...fffffttttttttttttttttttttttttttttttttttttttttBBRR...Rpp..",
+"..ffffffttBBtttttttttttttttttttttttttttttttttttBBBR.....pp..",
+"ppffffffBBttttttttttttttBttttttttttttttttttttttBBBR.....Rpp.",
+"RpttttttttttttttttttttttBttttttttttttttttttttttBBB.......Rp.",
+".ttttttttttttttttttttttBffffftttttttttttttttttBBBB........pp",
+".....cccttttttttttttttBfffffffffttttttttttttttBBB.........pp",
+"...ww.BBttttttttttttBBfffffffffffttttttttttttBBBB.........Rp",
+"...wx..BBBttttttttBBBfffffffffffffttttttttttBBBB...........R",
+".........BBBBBBBBBBfffffffffffffffttttttttBBBBBR............",
+".........BBBB.......ffffffffffffftttttttBBBBBBR.............",
+"........BBBBBB....BBBBfffffffffftttttBBBBBBBB...............",
+"........BBBBBB...BBBBBBffffffBBBBBBBBBBBBBBBB...............",
+"........ppBpB....BBBBBB..BBBBBBBBBBBBBBBBBBBB...............",
+".................ppBpB......BBBBBBBBBBppBpBB................"],
+anim:[{},{11:[52,"pppp"],12:[51,"pppppp"],13:[50,"ppRRRpp"],14:[51,"RR..Rpp"],15:[50,"RR....pp"],16:[51,".....Rpp"],17:[50,".......pp"],18:[50,".......R"],19:[57,".pp"],21:[58,"R"],22:[58,".R"],23:[59,"."]},
+  {},
+  {11:[52,"pppp"],12:[9,"fffffffffttttttffffffffffffffttttttttBB...pppppp"],13:[8,"BfffffffffttttttfffffffffffffttttttttttBB.ppRRRpp"],14:[51,"RR..Rpp"],15:[50,"RR....pp"],16:[51,".....Rpp"],17:[50,".......pp"],18:[50,".......R"],19:[57,".pp"],21:[58,"R"],22:[58,".R"],23:[59,"."]}]},
+rat_fight:{rate:[120,60,120,12],
+base:[
+".........................BBBBB.....................................................",
+".......................BBBppBBBB...................................................",
+"......................BBppppppBBB..................................................",
+".....................BpppppppppBBB.................................................",
+"....................BBppppppppppBB.................................................",
+"....................BppppppppppppBB................................................",
+"....................BppppppppppppBB................................................",
+"....................BppppppppppppBB................................................",
+"....................BppppppppppppBB................................................",
+"....................BpppppppppppBBB......ttttttttB.................................",
+"....................BBpppppppppRBBB.tttttttttttttttttBB............................",
+".....................BBppppppRRBBBttttttttttttttttttttttBB.........................",
+"..............tttttttBBBppppRRBBBtttttttttttttttttttttttttBB.......................",
+"...........tttttttttttBBBBBBBBBBBfffffffffffffftttttttttttttBB.....................",
+".........ttttttbbtttttttBBBBBBBffffffffffffffffffftttttttttttBB....................",
+"........tttffbbfffffftttttttttffffffffffffffffffffftttttttttttBB...................",
+".......ttffbbffffffffffftttttttffffffffffffffffffffftttttttttttBB..................",
+"......ttffffffffffffffffftttttttffffffffffffffffffffftttttttttttBB.................",
+".....ttfffffwwkkfffffffffttttttttfffffffffffffffffffttttttttttttBBB.....pppp.......",
+"....tttfffffkkkkffffffffftttttttttfffffffffffffffffftttttttttttttBBB...ppppp.......",
+"....ttttffffkkkkffffffffftttttttttfffffffffffffffftttttttttttttttBBB..pppppppp.....",
+"....ttftffffkkkkffffffffttttttttttffffffffffffffttttttttttttttttttBBBpppRRRRpp.....",
+"....tfftfftfffffffffftttttttttttttttttttttttttttttttttttttttttttttBBBppRR...Rpp....",
+"....tfftffttttttttttttttttttttttttttttttttttttttttttttttttttttttttBBBpRR.....ppp...",
+"....ffftffttttttttttttttttttttttttttttttttttttttttttttttttttttttttBBBRR......Rpp...",
+"ppf.ffftffttttBBBtttttttttttttttttttttttttttttttttttttttttttttttttBBBR........Rpp..",
+"Rpf.ffftfftBBBttttttttttttttttttttttttttttttttttttttttttttttttttttBBBR.........pp..",
+".tt.tttttttttttttttttttttttttttttBtttttttttttttttttttttttttttttttBBBB..........Rpp.",
+".tt.tttttttttttttttttttttttttttttBtttttttttttttttttttttttttttttttBBBB...........pp.",
+"..c.ccccccctttttttttttttttttttttBfffffffttttttttttttttttttttttttBBBBB...........Rpp",
+"......cccccttttttttttttttttttttBffffffffffftttttttttttttttttttttBBBBB............pp",
+"....wwwccccttttttttttttttttttBBBfffffffffffffttttttttttttttttttBBBBB.............Rp",
+"....wxxBBBttttttttttttttttttBBBfffffffffffffffttttttttttttttttBBBBBB..............R",
+".........BBBBttttttttttttBBBBffffffffffffffffffttttttttttttttBBBBBB................",
+"..........BBBBBBBBBBBBBBBBBBfffffffffffffffffffttttttttttttBBBBBBB.................",
+".............BBBBBBBBBBBB.ffffffffffffffffffffftttttttttttBBBBBBB..................",
+"...........BBBBBBB.........ffffffffffffffffffftttttttttBBBBBBBBB...................",
+"..........BBBBBBBBB......BBBBBffffffffffffffftttttttBBBBBBBBBBB....................",
+"..........BBBBBBBBBB...BBBBBBBBBfffffffffffttttBBBBBBBBBBBBBBB.....................",
+"..........BBBBBBBBBB..BBBBBBBBBBffffffffBBBBBBBBBBBBBBBBBBBBBB.....................",
+"..........pBpBpBBBB...BBBBBBBBBB..BBBBBBBBBBBBBBBBBBBBBBBBBBBB.....................",
+".......................BBBBBBBBB....BBBBBBBBBBBBBBBBBBBBBBBBBB.....................",
+".......................p.pBpBB...........BBBBBBBBB..p.pBpBBB......................."],
+anim:[{},{15:[73,"ppp"],16:[71,"ppppp"],17:[71,"pppppp"],18:[70,"pppRRppp"],19:[69,"ppRRR.Rppp"],20:[69,"ppR....Rpp"],21:[70,"R......Rpp"],22:[69,"RR.......pp"],23:[69,"R........Rpp"],24:[70,".........pp"],25:[69,"..........Rpp"],26:[69,"...........pp"],27:[79,".R"],28:[80,".pp"],29:[80,"."],30:[81,"R"],31:[81,".R"],32:[82,"."]},
+  {},
+  {15:[73,"ppp"],16:[71,"ppppp"],17:[71,"pppppp"],18:[12,"fffffffffffffttttttttfffffffffffffffffffttttttttttttBBB...pppRRppp"],19:[12,"ffffffffffffftttttttttfffffffffffffffffftttttttttttttBBB.ppRRR.Rppp"],20:[11,"BffffffffffffftttttttttfffffffffffffffftttttttttttttttBBB.ppR....Rpp"],21:[70,"R......Rpp"],22:[69,"RR.......pp"],23:[69,"R........Rpp"],24:[70,".........pp"],25:[69,"..........Rpp"],26:[69,"...........pp"],27:[79,".R"],28:[80,".pp"],29:[80,"."],30:[81,"R"],31:[81,".R"],32:[82,"."]}],
+hit:{0:[25,"....."],1:[23,"........."],2:[22,"..........."],3:[21,"............."],4:[20,".............."],5:[20,"..............."],6:[20,"..............."],7:[20,"....BBBBBB....."],8:[20,"..BBBppppBBBB.."],9:[20,".BpppppppppBBB."],10:[21,"pppppppppppp"],11:[20,"BppppppppppppBB"],12:[20,"BpppppppppRRpBB"],13:[20,"BBpppppppRppBBB"],14:[15,"ttttttBBBBpppRBBBBB"],15:[13,"fffffffftBBBBBBBBBBB"],16:[11,"fffffffffffffBBBBBB"],18:[12,"kffffffffffffttttttttfffffffffffffffffffttttttttttttBBB........."],19:[12,"fkffffffffffftttttttttfffffffffffffffffftttttttttttttBBB........"],20:[12,"ffkfffffffffftttttttttfffffffffffffffftttttttttttttttBBB.........."],21:[12,"fffkffffffffttttttttttffffffffffffffttttttttttttttttttBBB........."],22:[14,"kfffffftttttttttttttttttttttttttttttttttttttttttttttBBB...pppp..."],23:[13,"kttttttttttttttttttttttttttttttttttttttttttttttttttttBBB.pppppp...."],24:[12,"ktttttttttttttttttttttttttttttttttttttttttttttttttttttBBBppppppppp.."],25:[69,"pppRRRpppp.."],26:[69,"pRRR..RRppp."],27:[69,"RR......Rpp.."],28:[69,"R........Rpp."],29:[79,"pp.."],30:[79,"Rpp."],31:[7,"RcccttttttttttttttttttBBBfffffffffffffttttttttttttttttttBBBBB............Rp"],32:[4,"RRRRBBttttttttttttttttttBBBfffffffffffffffttttttttttttttttBBBBBB.............pp"],33:[4,"RRRR.BBBBttttttttttttBBBBffffffffffffffffffttttttttttttttBBBBBB..............Rp"],34:[82,"R"]}},
+cat:{rate:[170,60,170,12],
+base:[
+".............o..............",
+"...w........oo..............",
+"..ww........opo.............",
+"..ww.wwwwwooooo.............",
+"..bbbwwwooooOOO.............",
+".bbbbbwwoooOOOOO............",
+".wbbbwwooooOOOOO............",
+".wwwwkewooowkeOow...........",
+".wwwekewoooekeoow...........",
+".wwwekewwwoekewww...........",
+".wwwwwwxxxxwwwwww...........",
+"..wwxwwwppwxxxww............",
+"..wxwwwwRRwwxxxwwwwob.......",
+"...xwwwxwwxwxxxwwooobbb.....",
+".....xxxxxxxxxwwooooobbb....",
+"......wxxxxwwwwwooooooooo...",
+".....wwwwwwwwwwooooooOOOOo..",
+".....wwwwwwwwwwoooooOOOOOO..",
+"....wwwwwwwwwwwwooooOOOOOO..",
+"....wwwwwwwwwwwwoooOOOOOOOO.",
+"....wwwwwwwwwwwwoooOOOOOOOO.",
+"....wwwwwwwwwwwwoooOOOOOOOO.",
+".....xwwwwwwwwxwoooOOOOOOOO.",
+".....xwwwwwwwwxwoowwwwwwxxx.",
+"....xxxxwwwwxxxwwwwwwwwwwxx.",
+"...xxxxxxxxxxxwwwwwwwwwwwwxx",
+".OOxxxxxxxxxxwwwwwwwwwwwwwxx",
+"OOOOxxxxwwwwxwwwwwwwwwwwwwxx",
+"OOOOOxx.wwwwxwwwxwwwwwwwwxxx",
+".OOOOOoowwwxxwwwwxwwwwwwxxx.",
+"..OOOOOowwwxxwwxxxxxxxxxxxo.",
+"..oOOOOoxxxoxxxxxxxxxooooooo",
+"...oOO.................oooo."],
+anim:[{},{24:[1,"OO"],25:[0,"OOO"],26:[0,"O"],27:[0,"."],28:[0,".."],29:[1,"."],30:[2,"."]},
+  {},
+  {7:[5,"wwwooooOO"],8:[4,"wwwwoooooo"],9:[4,"kkkwwwokkk"]}]},
+dog:{rate:[240,12],
+base:[
+"..............BB..........................................",
+"..............BB..........................................",
+"..............BBB.........................................",
+".............BBbB.........................................",
+".............BbbBB........................................",
+".........ffffBbbbB........................................",
+"......tfffffBBBBBBB.......................................",
+".....fffffccccccccf.......................................",
+"....fffbbccccccccccf......................................",
+"...tfffffbbccccccccft.....................................",
+"...fffffwkcbcccccccff.....................................",
+"...fffffkkccccccccfff......B..B...........................",
+".kkffffffffffffffffffB..B..B..B...........................",
+"kkgkfffffffffffffffffB..B.BB.BB...........................",
+"kkkkffffffffffffffffBB.BB.BBbBBBbbbbbbbb..................",
+".BBBBBffffffffffffffBBBBBBBBBBBBbbbbbbbbbb................",
+".BBBBBfffffffffffffBBBBBBBbbbbbbbbbbbbbbbbBB..............",
+".BBBBBBfffffffffffttfffftBBbbbbbbbbbbbbBBBBBB.............",
+"..BBBBBffffffffftttfffffttBBBBBBBBBBBBBBBBBBft............",
+"..RwwRwRttttttttttffffffftBBBBBBBBBBBBBBBffffftttt........",
+"...w.....ttttttccccfffffftfffffffffffffffffffffftttt......",
+"..........ffccccccccffffftfffffffffffffffffccccffftttt....",
+"..........fccccccccccfffftffffffffffffffffccccccffftttt...",
+"..........fccccccccccfffftfffffffffffffffccccccccffttttt..",
+"..........fccccccccccfffftfffffffffffffffccccccccfffttttt.",
+"..........fccccccccccfffftccccccccccffffffccccccffff.tttt.",
+"..........tccccccccccfffttcccccccccccccffffccccfffff..tttt",
+"..........tccccccccccfffffffccccccccccccffffffffffff..tttt",
+"...........tccccccccfffcccffccccccccccccfffffffffff.......",
+"............tccccccffffcccffcccccccccccftffffffffff.......",
+"............ttccccffftfcccffccccccccftttttfffffffff.......",
+"..............tttfttttfcccffttttttttttttttttfffffff.......",
+"...............tttttttfcccfftttttttttttt.ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................ttttttfcccff.............ttttffffff.......",
+"................BBBBBcccccccc............BBBcccccccc......",
+"................BBBBBcccccccc............BBBcccccccc......",
+"................BBBBBcccccccc............BBBcccccccc......"],
+anim:[{},{8:[7,"ff"],9:[9,"cc"],10:[8,"ffcc"],11:[10,"k"]}]},
+dog_fight:{rate:[200,12],
+base:[
+"....................B.........................................................",
+"...................BBB........................................................",
+"...................BBB........................................................",
+"..................BBbBB.......................................................",
+"..................BBbBB.......................................................",
+"..................BBbbBB......................................................",
+".................BBbbbBB......................................................",
+"............fffffBBbbbbBB.....................................................",
+".........ffffffffBbbbbbBB.....................................................",
+"........fffffffccccccccff.....................................................",
+"......tffffffcccccccccccff....................................................",
+"......ffffbbfccccccccccccft...................................................",
+".....fffffffbbccccccccccccft..................................................",
+"....tffffffwkkbbccccccccccff..................................................",
+"....tffffffkkkcccccccccccffft.................................................",
+"....fffffffkkkccccccccccfffft.................................................",
+".kkkffffffffffffccccccfffffft...........BB....................................",
+"kkkkkfffffffffffffffffffffffB...BB..BB..BB....................................",
+"kkgkkfffffffffffffffffffffffBB..BB..BB.BBBbbbbbbb.............................",
+"kkkkkffffffffffffffffffffffBBB.BBB.BBBbBBBBbbbbbbbbbb.........................",
+"..kfffBBfffffffffffffffffffBBBtBBBbBBBBBBBBbbbbbbbbbbbbb......................",
+".BBBBBBBffffffffffffffffffBBBBBBBBBBBBBBBBBbbbbbbbbbbbbbbB....................",
+"..BBBBBBBfffffffffffffffffBBBBBBBBBbbbbbbbbbbbbbbbbbbbbbBBBB..................",
+"..BBBBBBBffffffffffffffffttfffffttBBbbbbbbbbbbbbbbbbbBBBBBBBB.................",
+"..BBBBBBBfffffffffffffftttffffffttBBBBBBBBBBBBBBBBBBBBBBBBBBft................",
+"..BBBBBBBffffffffffffttttffffffffttBBBBBBBBBBBBBBBBBBBBBBBfffft...............",
+"...wRRwRwRRttttttttttttccffffffffttBBBBBBBBBBBBBBBBBBBBffffffftttttt..........",
+"...RwRRRRRRttttttttttcccccfffffffttfffffBBBBBBBBBfffffffffffffffftttttt.......",
+".............tffcccccccccccfffffffttfffffffffffffffffffffffcccfffffttttt......",
+".............tffcccccccccccfffffffttfffffffffffffffffffffccccccccfffttttt.....",
+".............tfcccccccccccccffffffttffffffffffffffffffffccccccccccfffttttt....",
+".............tfcccccccccccccffffffttfffffffffffffffffffcccccccccccffftttttt...",
+".............tfcccccccccccccffffffttfffffffffffffffffffcccccccccccfffftttttt..",
+".............tfcccccccccccccffffftttffffffffffffffffffffccccccccccffffttttttt.",
+".............tfcccccccccccccfffffttcccccccccccccffffffffcccccccccfffff.tttttt.",
+".............tfcccccccccccccfffffttcccccccccccccccccfffffcccccccffffff..tttttt",
+"..............tcccccccccccccffffffffffcccccccccccccccfffffffffffffffff...ttttt",
+"..............tfccccccccccccffffffffffccccccccccccccccffffffffffffffff....tttt",
+"...............tcccccccccccfffffcccfffccccccccccccccccfffffffffffffff.........",
+"...............ttcccccccccffffffcccfffcccccccccccccccffffffffffffffff.........",
+"................ttcccccccfffftffcccfffcccccccccccccfttttfffffffffffff.........",
+".................tttccccffffttffcccfffccccccccfftttttttttffffffffffff.........",
+"..................tttttfttttttffcccffftttttttttttttttttttttffffffffff.........",
+"....................ttttttttt.ffcccffftttttttttttttttttttttttffffffff.........",
+"......................ttttttt.ffcccfffttttttttttttt....ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+"......................ttttttt.ffcccfff.................ttttttffffffff.........",
+".....................BBBBBBBBcccccccccc................BBBBBcccccccccc........",
+".....................BBBBBBBBcccccccccc................BBBBBcccccccccc........",
+".....................BBBBBBBBcccccccccc................BBBBBcccccccccc........",
+".............................cccccccccc.....................cccccccccc........"],
+anim:[{},{11:[10,"ff"],12:[12,"cc"],13:[11,"fffcc"],14:[11,"fff"],15:[14,"k"]}],
+hit:{11:[10,"ff"],12:[12,"cc"],13:[11,"kcckc"],14:[11,"f"],15:[11,"f"],16:[11,"kffk"],25:[5,"RRRRRR"],26:[4,"wwwwwRt"],27:[4,"RRRRRR."],28:[4,"RRRRRR"],29:[4,"RRRRRR"]}},
+doghappy:{rate:18,
+base:[
+"...................BB.......................................",
+".........ffffffBBBbBB.......................................",
+"......tfffffffbbbbbB..................................ff....",
+".....fffffcccccBbbbB.................................ffff...",
+"....fffffcccccccBbbB.................................ffff...",
+"...tfffffccccccccBBft...............................ffff....",
+"...ffffffkkcccccccBff..............................fffff....",
+"...fffffkfckccccccfff..............................ffff.....",
+".kkffffffffffffffffff.............................fffff.....",
+"kkgkfffffffffffffffff.............................ffff......",
+"kkkkfffffffffffffffftt....bbbbbbbbbbbbbb.........ffff.......",
+".BBBBBfffffffffffffftfttbbbbbbbbbbbbbbbbbb.......ffff.......",
+".BBBBBfffffffffffffttfftbbbbbbbbbbbbbbbbbbBB....ffff........",
+".BBBBBBfffffffffffttfffftBBbbbbbbbbbbbbBBBBBB..fffff........",
+"..BBBBBffffffffftttfffffttBBBBBBBBBBBBBBBBBBft.ffff.........",
+"...RpppRttttttttttffffffftBBBBBBBBBBBBBBBffffftffff.........",
+"....prp..ttttttccccfffffftffffffffffffffffffffffff..........",
+"...pprpp..ffccccccccffffftfffffffffffffffffccccfff..........",
+"....prp...fccccccccccfffftffffffffffffffffccccccfff.........",
+"....ppp...fccccccccccfffftfffffffffffffffccccccccff.........",
+"..........fccccccccccfffftfffffffffffffffccccccccfff........",
+"..........fccccccccccfffftccccccccccffffffccccccffff........",
+"..........tccccccccccfffttcccccccccccccffffccccfffff........",
+"..........tccccccccccfffffffccccccccccccffffffffffff........",
+"...........tccccccccfffcccffccccccccccccfffffffffff.........",
+"............tccccccffffcccffcccccccccccftffffffffff.........",
+"............ttccccffftfcccffccccccccftttttfffffffff.........",
+"..............tttfttttfcccffttttttttttttttttfffffff.........",
+"...............tttttttfcccfftttttttttttt.ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................ttttttfcccff.............ttttffffff.........",
+"................BBBBBcccccccc............BBBcccccccc........",
+"................BBBBBcccccccc............BBBcccccccc........",
+"................BBBBBcccccccc............BBBcccccccc........"],
+anim:[{},{2:[54,"...ff"],3:[53,"...ffff"],4:[53,"..fffff"],5:[52,"...ffff"],6:[51,"...ffff"],7:[51,"..fffff"],8:[50,"..fffff"],9:[50,".fffff"],10:[49,"..ffff"],11:[49,".ffff"],12:[48,".fffff"],13:[47,".fffff"],14:[51,"f"]},
+  {},
+  {2:[51,"ff..."],3:[50,"ffff..."],4:[50,"ffff..."],5:[50,"fff..."],6:[49,"ffff..."],7:[49,"ffff.."],8:[48,"ffff..."],9:[48,"ffff.."],10:[48,"ffff."],11:[47,"ffff.."],12:[47,"ffff."],13:[51,"."],14:[46,"ffff."],15:[50,"."],16:[49,"."]}]},
+key:{float:true,
+base:[
+"......YYYY.....................",
+"....YyyyyyYY...................",
+"..YyyyyyyyyYY..................",
+"..yyyLLyyyyyYY.................",
+".YyLLLLLyyyyyYY................",
+"YyyLLL....yyyYY................",
+"YyyLL......yyyyyLLLLLLLyyyyyyyy",
+"Yyyy.......yyyyyyyyyyyyyyyyyyyy",
+"Yyyy.......yyyYYYYYYYYYYYYYYYYY",
+"Yyyyy......yyYYYYYYYYYYYYYYYYYY",
+"Yyyyy.....yyyYY........YYY...yY",
+".YyyyyyyyyyyYYY........YYY...yY",
+".YYyyyyyyyyyYY.........YYY...yY",
+"..YYYyyyyyYYY..........YYY...yY",
+"...YYYYYYYYY.................yY",
+".....YYYYY....................."]},
+coins:{
+base:[
+"...................YyLLyyyy....................",
+"..................YyLLLLyyyy...................",
+"..................YyyyyyyyyY..........YY.......",
+"..................OYYyyyyYYYYYY......yyyYY.....",
+"...............yyyyOYYYYYYOyyyYYY...YyyyyY.....",
+".............yLLLLyyyOOOOLLLyyyyYYYYyyLyyY.....",
+"............YyyLLyyyyyYyyyyyyyyyYYYYyyLyyYY....",
+"............YYyyyyyyyYOYYyyyyyyYOyYYyyLyyYY....",
+"............YYYYYYYYYYYOYYYYYYYOyyYYyyLyyY.....",
+"..........YyyyOOYYYOOLyyOOOOOOOyyyYYyyyyyY.....",
+"........YyLLLLyyyyyLLLyyyyYYyLLLLyyyYyyyYY.....",
+"........YyyLLyyyyYyyyyyyyyYYyyLyyyyyYYYYY......",
+"........YYyyyyyyYYYYYyyYYYOYyyyyyyyYYYYYYY.....",
+".......YOYYYYYYYYOOYYYYYOOYOYYYYYYYYOyYYYY.....",
+".....yLLLOOOYYOOOyyYOOOYyLLLOOOYYOOOLyyyyYY....",
+"..yyyyyyLyyyyyLLLLyyyYYyyLLLyyyyYyyLLLLyyyyyy..",
+"YyLLLLyyyYyyYyyLLyyyyyYYyyyyyyyYYYyyyYyLLLLyyyY",
+"YyyyyyyyyYYYYYyyyyyyyYOYYYyyyYYYOYYyyYyyyyyyyyY",
+"YYyyyyyyYYYYOYYYYYYYYYYOOYYYYYOOYOYYYYYyyyyyyYY",
+"OYYYYYYYYO....OOYYYOO.....OOO......OOOYYYYYYYYO",
+"..OOOOOO...............................OOOOOO.."]},
+sun:{float:true,
+base:[
+"............yy............",
+"............yy............",
+"...........yyyy...........",
+"...oo.....yyy........oo...",
+"...ooooo..oyyyoo..ooooo...",
+"....ooo.yyyyyyyyoo.ooo....",
+"....oo.yyyyyyyyyyyo.oo....",
+"....o.yyyyLyyyyyyyyo.o....",
+".....yyyLLLLLyyyyyyoo.....",
+".....yyLLLLLLLyyyyyyo.....",
+"....oyyLLLLLLLyyyyyyooy...",
+"..y.yyyyLLLLLyyyyyyyooyy..",
+"yyy.yyyyyyLyyyyyyyyyooyyyy",
+"yyy.yyyyyyyyyyyyyyyyooyyyy",
+"..y.oyyyyyyyyyyyyyyyooyy..",
+"....oyyyyyyyyyyyyyyyooy...",
+".....oyyyyyyyyyyyyyoo.....",
+".....oyyyyyyyyyyyyyoo.....",
+"....o.oyyyyyyyyyyyoo.o....",
+"....oo.ooyyyyyyyooo.oo....",
+"....ooo.oooooooooo.ooo....",
+"...ooooo..oooooo..ooooo...",
+"...oo.....yyyyyy.....oo...",
+"...........yyyy...........",
+"............yy............",
+"............yy............"]}
+};
+function sprFrame(s,patch){
+  const m=s.base.map((row,r)=>{ const q=patch&&patch[r]; if(!q) return row;
+    return row.slice(0,q[0])+q[1]+row.slice(q[0]+q[1].length); });
+  const p=px(m[0].length,m.length); stamp(p,m,0,0); return outline(p);
+}
+const sprCache={};
+function sprite(name){
+  if(sprCache[name]) return sprCache[name];
+  const s=SPR[name], anim=(s.anim||[{}]).map(f=>toCanvas(sprFrame(s,f)));
+  const hit=s.hit?sprFrame(s,s.hit):null;
+  return sprCache[name]={anim,hit:hit&&toCanvas(hit),white:hit&&toCanvas(silhouette(hit,"w")),
+    w:anim[0].width,h:anim[0].height,rate:s.rate||16,float:!!s.float};
+}
+function animFrame(rate,n,t){               /* which frame of an n-frame loop shows at tick t */
+  if(!Array.isArray(rate)) return Math.floor(t/rate)%n;
+  let k=t%rate.reduce((a,b)=>a+b,0), i=0;
+  while(k>=rate[i]){ k-=rate[i]; i++; }
+  return i;
+}
+function sprAt(p,name,x,y,f){                /* stamp a sprite frame into a background buffer */
+  const s=SPR[name], a=s.anim||[{}]; blit(p,sprFrame(s,a[f%a.length]),x,y);
+}
+
+/* ---- v2 backgrounds: draw(frame) returns a 320x150 buffer, cached per frame.
+   ground = canvas y that standing sprites rest their feet on;  sky = y floating items center on
+   frames/rate = baked animation loop (torch flicker etc.); fx(t) = cheap per-tick extras
+   owns = sprite the background draws itself (e.g. the sun inside the exit's arch)
+   OVERLAY[sprite](p,f) = scenery a node shows instead of a sprite (doors), baked in too */
+const BG={}, OVERLAY={};
+const bgCache={};
+function bgFrame(name,f,ov){
+  const k=name+":"+f+":"+(ov||"");
+  if(!bgCache[k]){ const p=BG[name].draw(f); if(ov) OVERLAY[ov](p,f); bgCache[k]=toCanvas(p); }
+  return bgCache[k];
+}
+function hash(i,j){ const n=Math.sin(i*127.1+j*311.7)*43758.5453; return n-Math.floor(n); }
+
+/* background props: stamped into scenes, no sprite outline */
+const PROP={
+torch:{flame:[[
+"....L....",
+"...yL....",
+"...yLy...",
+"..oyLyo..",
+"..oyLLyo.",
+".OoyLLyo.",
+".OoyyyoO.",
+"..OoooO..",
+"...OOO..."],[
+".........",
+"....L....",
+"...Ly....",
+"..yLLyo..",
+"..oyLLyo.",
+".OyLLyyo.",
+".OoyyyoO.",
+"..OoooO..",
+"...OOO..."],[
+"...L.....",
+"...Ly....",
+"..yLy....",
+"..yLLyo..",
+".oyLLyo..",
+".OoyLLyO.",
+".OoyyyoO.",
+"..OoyoO..",
+"...OOO..."]],
+stick:[
+"..kkkkk..",
+"..k656k..",
+"...k5k...",
+"...ftB...",
+"...ttB...",
+"...ftB...",
+"..k454k..",
+"..k323k..",
+"...tBB...",
+"...tBb...",
+"....b...."]},
+web:[
+"gg..x....g.....",
+"x.gg.x..g......",
+"x...gxgg.......",
+".x..xg.g.......",
+".x.x..g.g......",
+"..xx..g..g.....",
+"..g.gg....g....",
+".g....g........",
+".g.....g.......",
+"g..............",
+"g.............."]
+};
+function torchAt(p,x,y,f){                 /* x,y = top-left of the flame */
+  stamp(p,PROP.torch.flame[f%3],x,y); stamp(p,PROP.torch.stick,x,y+9);
+}
+function flip(m){ return m.map(r=>[...r].reverse().join("")); }
+
+/* ---- Level 1: the cave ---- */
+function caveBase(){
+  const p=px(320,150);
+  rect(p,0,0,320,104,"k");                                        /* mortar */
+  for(let j=0;j<13;j++){                                          /* brick wall */
+    const y=j*8-2, off=(j&1)*8;
+    for(let i=-1;i<21;i++){
+      const x=i*16+off, v=hash(i,j);
+      let f="2",hi="3",lo="1";
+      if(v<0.14){ f="1"; hi="2"; lo="k"; }
+      if(v>0.97){ rect(p,x,y,15,7,"k"); rect(p,x,y,15,1,"2"); continue; }  /* missing brick */
+      rect(p,x,y,15,7,f); rect(p,x,y,15,1,hi); rect(p,x,y,1,6,hi);
+      rect(p,x+1,y+6,14,1,lo); rect(p,x+14,y+1,1,6,lo);
+      if(v>0.82&&v<0.88){ const cx0=x+4+Math.floor(hash(j,i)*6);       /* crack */
+        rect(p,cx0,y+1,1,2,"k"); rect(p,cx0+1,y+3,1,2,"k"); rect(p,cx0+2,y+5,1,1,"k"); }
+      if(v>0.6&&v<0.64&&j>6){ rect(p,x+2,y+5,7,2,"n"); rect(p,x+4,y+4,3,1,"n"); rect(p,x+3,y+6,4,1,"E"); } /* moss */
+    }
+  }
+  rect(p,0,96,320,8,"2"); rect(p,0,96,320,1,"4"); rect(p,0,97,320,1,"3");  /* plinth */
+  for(let i=0;i<20;i++) rect(p,i*16+((i*7)%5),98,1,5,"1");
+  rect(p,0,103,320,1,"k");
+  const rows=[[104,7,22],[111,9,28],[120,12,36],[132,18,46]];     /* flagstone floor */
+  rows.forEach(([y,h,w],j)=>{
+    rect(p,0,y,320,h,"k");
+    for(let x=-Math.floor(hash(j,9)*w);x<320;){
+      const sw=w-4+Math.floor(hash(x,j)*8), v=hash(j,x);
+      const f=v<0.25?"1":"2";
+      rect(p,x+1,y+1,sw-1,h-1,f); rect(p,x+1,y+1,sw-1,1,f==="1"?"2":"3");
+      rect(p,x+1,y+h-1,sw-1,1,"1");
+      if(v>0.85) rect(p,x+4+Math.floor(v*sw/3),y+3,2,1,"4");       /* pebble */
+      x+=sw;
+    }
+  });
+  shift(p,0,0,320,8,DIM); shift(p,0,8,320,8,DIM,0);               /* gloom up top */
+  shift(p,0,0,4,150,DIM); shift(p,4,0,6,150,DIM,1);               /* and at the edges */
+  shift(p,316,0,4,150,DIM); shift(p,310,0,6,150,DIM,1);
+  shift(p,0,142,320,8,DIM,0);
+  stamp(p,PROP.web,0,0); stamp(p,flip(PROP.web),305,0);
+  return p;
+}
+const FLICK=[62,66,59];                             /* torch light radius per frame */
+function caveScene(torches,dark){
+  return f=>{
+    const p=caveBase();
+    if(dark) shift(p,0,0,320,150,DIM);
+    for(const [x,y] of torches) glow(p,x+4,y+4,FLICK[f%3]+(dark?8:0),3,true);
+    for(const [x,y] of torches) torchAt(p,x,y,f+x);
+    return p;
+  };
+}
+BG.cave  ={ground:130,frames:3,rate:30,draw:caveScene([[24,42],[287,42]])};
+BG.dark  ={ground:130,frames:3,rate:30,draw:caveScene([[156,36]],true)};
+BG.battle={ground:132,frames:3,rate:30,draw:caveScene([[24,42],[287,42]],true)};
+BG.title ={ground:130,frames:3,rate:30,draw:caveScene([[66,46],[245,46]])};
+BG.exit  ={ground:130,frames:1,draw:()=>{
+  const p=caveBase();
+  shift(p,0,0,320,150,DIM); shift(p,0,0,320,150,DIM,0);
+  const ax=160, top=40, rw=30;
+  glow(p,ax,90,110,2,false);
+  /* daylight spilling across the floor */
+  for(let y=104;y<150;y++){ const s=Math.round((y-104)*0.9);
+    shift(p,ax-30-s,y,60+s*2,1,LIT); if(y<128) shift(p,ax-20-s/2,y,40+s,1,LIT,(y&1)); }
+  /* the way out: an arched opening onto daylight */
+  const hill=x=>78+Math.round(Math.sin(x/9)*3), near=x=>86+Math.round(Math.sin(x/6+2)*2);
+  for(let y=top-5;y<104;y++){
+    const dy=Math.max(0,top+rw-y), half=Math.round(Math.sqrt(Math.max(0,rw*rw-dy*dy)));
+    if(y<top) continue;
+    rect(p,ax-half-6,y,half*2+12,1,"5"); rect(p,ax-half-5,y,1,1,"6"); rect(p,ax+half+4,y,1,1,"3");
+    for(let x=ax-half;x<ax+half;x++){
+      let c=y<60?"s":y<68?((x+y)&1?"s":"w"):"w";
+      if(y>=hill(x)) c=y===hill(x)?"a":"l";
+      if(y>=near(x)) c=y===near(x)?"e":"E";
+      if(y>=94) c="c";
+      rect(p,x,y,1,1,c);
+    }
+  }
+  for(let y=94;y<104;y++){ const w=4+(y-94);                     /* the path out */
+    rect(p,ax-w,y,w*2,1,"L"); rect(p,ax-w,y,1,1,"f"); rect(p,ax+w-1,y,1,1,"f"); }
+  rect(p,ax-25,61,10,2,"w"); rect(p,ax-23,60,6,1,"w"); rect(p,ax+14,65,12,2,"w"); rect(p,ax+16,64,7,1,"w");
+  sprAt(p,"sun",ax-16,42,0);
+  return p;
+}, owns:"sun", fx:t=>{                                                       /* dust drifting in the light */
+  cx.fillStyle=PAL.L;
+  for(let i=0;i<9;i++){ const ph=t/200+i*7.3;
+    cx.fillRect(Math.round(140+hash(i,1)*40+Math.sin(ph)*8),Math.round(120-((t/8+i*17)%70)),1,1); }
+}};
+/* doors set into the cave wall: stone arch frame, plank or iron leaf */
+function archSpan(x,top,w,y){               /* [left,right) of a round-topped arch at row y */
+  const r=w/2, dy=Math.max(0,top+r-y-0.5), half=Math.sqrt(Math.max(0,r*r-dy*dy));
+  return [Math.round(x+r-half),Math.round(x+r+half)];
+}
+function arch(p,x,top,w,bot,c){
+  for(let y=top;y<bot;y++){ const [a,b]=archSpan(x,top,w,y); if(b>a) rect(p,a,y,b-a,1,c); }
+}
+function door(p,x,top,w,kind,f){
+  const bot=104, r=w/2;
+  arch(p,x-4,top-4,w+8,bot,"5"); arch(p,x-3,top-3,w+6,bot,"4");   /* stone frame */
+  arch(p,x-1,top-1,w+2,bot,"k");
+  const hot=kind==="hot";
+  arch(p,x,top,w,bot,hot?"O":kind==="iron"?"2":"B");
+  for(let y=top;y<bot;y++){                                        /* planks or plates */
+    const [a,b]=archSpan(x,top,w,y);
+    for(let i=a;i<b;i++){
+      const pl=(i-x)%6;
+      let c=hot?(pl===0?"R":pl===1?"o":"O"):kind==="iron"?(pl===0?"1":pl===1?"3":"2"):(pl===0?"b":pl===1?"f":"t");
+      if(hot&&(i+y*3+f*5)%23===0) c="y";                           /* glowing cracks */
+      rect(p,i,y,1,1,c);
+    }
+  }
+  if(hot){ const fl=[0,1,2][f%3];                                  /* hot core, pulsing */
+    for(let y=top+r;y<bot;y++) shift(p,x+4,y,w-8,1,{O:"o",o:"y",R:"O",y:"L"},(fl===1?undefined:(y+fl)&1)); }
+  const bands=[top+Math.round(r*0.9),bot-12];
+  for(const y of bands){                                           /* iron bands with studs */
+    const [a,b]=archSpan(x,top,w,y);
+    rect(p,a,y,b-a,3,"k"); rect(p,a,y,b-a,1,"4");
+    for(let i=a+3;i<b-2;i+=6) rect(p,i,y+1,1,1,"6");
+  }
+  rect(p,x-6,bot-1,w+12,1,"5");                                    /* threshold */
+  return {mid:x+r,bot};
+}
+function doorRing(p,x,y){ rect(p,x,y,4,1,"Y"); rect(p,x-1,y+1,1,3,"Y"); rect(p,x+4,y+1,1,3,"Y"); rect(p,x,y+4,4,1,"Y"); rect(p,x,y,2,1,"y"); }
+OVERLAY.doors=(p,f)=>{
+  glow(p,160,80,58,2,true);                                        /* heat from the middle door */
+  door(p,46,46,52,"wood",f); doorRing(p,86,78);
+  door(p,228,72,30,"wood",f); doorRing(p,250,90);
+  door(p,138,56,44,"hot",f);
+};
+OVERLAY.firedoor=OVERLAY.doors;
+OVERLAY.backdoor=(p,f)=>{
+  door(p,132,40,56,"wood",f);
+  rect(p,152,70,16,20,"k"); rect(p,153,71,14,18,"Y"); rect(p,154,71,12,2,"y"); /* lock plate */
+  rect(p,154,87,13,1,"b"); rect(p,159,75,3,3,"k"); rect(p,160,78,1,5,"k");      /* keyhole */
+  for(const y of [52,66,92]){ const [a,b]=archSpan(132,40,56,y); rect(p,a,y,b-a,1,"k"); }
+};
+
+/* ---- outside: a sunny valley (levels 1-4) ---- */
+BG.outside={ground:132,sky:24,frames:1,draw:()=>{
+  const p=px(320,150);
+  rect(p,0,0,320,150,"s"); rect(p,0,0,320,18,"l"); rect(p,0,18,320,6,"l",0); /* sky */
+  rect(p,0,70,320,6,"w",1);
+  const cloud=(x,y,w)=>{ rect(p,x+4,y,w-8,2,"w"); rect(p,x,y+2,w,4,"w"); rect(p,x+2,y+6,w-4,1,"x");
+    rect(p,x+w/3|0,y-3,w/3|0,3,"w"); };
+  cloud(24,30,34); cloud(214,22,44); cloud(282,54,22);
+  const peaks=[[54,52],[128,44],[196,58],[262,46],[332,60]];       /* far mountains */
+  const rough=x=>Math.round(Math.sin(x*0.19)*1.5+Math.sin(x*0.07)*2); /* uneven, but in clean runs */
+  for(let x=0;x<320;x++){
+    let best=1e9, pk=null;
+    for(const q of peaks){ const h=q[1]+Math.abs(x-q[0])*0.7+rough(x+q[0])*Math.min(1,Math.abs(x-q[0])/6); if(h<best){ best=h; pk=q; } }
+    const top=Math.max(0,Math.round(best)), dx=x-pk[0];
+    for(let y=top;y<104;y++){
+      const edge=pk[0]-(y-pk[1])*0.3;                               /* shadow line runs down-left */
+      const lit=x<edge-1||(x<edge+1&&((x+y)&1));
+      const snow=y<pk[1]+8+(Math.floor(x/3)%3)*2;
+      let c=snow?(lit?"w":"x"):(lit?"l":"v");
+      if(!snow&&!lit&&dx>4&&(dx===Math.round((y-pk[1])*0.45)+6||dx===Math.round((y-pk[1])*0.9)+3)) c="V"; /* ridges */
+      rect(p,x,y,1,1,c);
+    }
+  }
+  const hill=x=>92+Math.round(Math.sin(x/34)*6+Math.sin(x/13)*2);  /* rolling green hills */
+  for(let x=0;x<320;x++){ const h=hill(x);
+    rect(p,x,h,1,120-h,"E"); rect(p,x,h,1,1,"e"); if(hill(x+1)>h||hill(x-1)>h) rect(p,x,h+1,1,1,"e"); }
+  for(let i=0;i<14;i++){ const x=Math.floor(hash(i,30)*310), y=hill(x)+2;   /* round trees */
+    rect(p,x-1,y-6,6,6,"n"); rect(p,x,y-7,4,1,"n"); rect(p,x,y-6,3,2,"E"); rect(p,x+1,y,2,3,"b"); }
+  rect(p,0,118,320,32,"E"); rect(p,0,118,320,2,"e");               /* meadow */
+  rect(p,0,120,320,2,"E",0);
+  for(let y=120;y<150;y++){ const w=Math.round(10+(y-120)*1.6);   /* dirt path */
+    rect(p,160-w,y,w*2,1,"f"); rect(p,160-w,y,1,1,"t"); rect(p,160+w-1,y,1,1,"t"); }
+  for(let i=0;i<46;i++){ const x=Math.floor(hash(i,31)*320), y=121+Math.floor(hash(i,32)*28);
+    if(Math.abs(x-160)<12+(y-120)*1.6+3) continue;
+    if(i%5===0){ rect(p,x,y,1,1,["p","y","w"][i%3]); rect(p,x,y+1,1,1,"n"); }
+    else { rect(p,x,y,1,2,"n"); rect(p,x+1,y+1,1,1,"n"); rect(p,x-1,y+1,1,1,"e"); } }
+  for(let i=0;i<6;i++){ const x=160-8+Math.floor(hash(i,33)*16), y=126+i*4; rect(p,x,y,2,1,"t"); }
+  return p;
+}};
+
+/* ---- 1.x art, still used by scenes not yet redrawn for v2 ---- */
+const OLD_PAL={g:"#8a8a9e",G:"#5c5c70",p:"#e8a0b4",k:"#1a1626",o:"#e8913c",
   O:"#b4632a",w:"#f2e9d8",b:"#3d2b1f",B:"#5c4030",y:"#ffd75e",Y:"#c9a227",
   r:"#e0566b",d:"#3a3154",D:"#2b2344",e:"#7ee08a",E:"#3f7a44",s:"#7ec8e8",
   t:"#6b4f35",n:"#2e4632",x:"#c9c2d8",f:"#d9a066",v:"#2f4a80",l:"#4f8fd6"};
-const SPR={
-rat:[
-"................",
-"....kk....kk....",
-"...kppk..kppk...",
-"...kgggkkgggk...",
-"..kggggggggggk..",
-".kgggkggggkgggk.",
-".kgggggggggggk..",
-".kggggggwwggggk.",
-"..kggggggggggk..",
-"...kggggggggk.pp",
-"....kkkkkkkkkpp.",
-"......k..k......"],
-cat:[
-"................",
-"...ok....ko.....",
-"...ook..koo.....",
-"...ooooooooo....",
-"..ookoookooo....",
-"..oooooooooo....",
-"..ooowkwooooo...",
-"...ooooooooooo..",
-"...ooooooooooo..",
-"...oooooooooO...",
-"...ok.ok..ooO...",
-"................"],
-doghappy:[
-"................",
-"..BBBb..........",
-".BBBBbb.........",
-".BkBBbb.......B.",
-"kBBBBbb......B..",
-".pBBBBBBBBBBBB..",
-"...BBBBBBBBBBB..",
-"...BBBBBBBBBBB..",
-"...BBBBBBBBBBB..",
-"...BB.BB..BB.BB.",
-"...BB.BB..BB.BB.",
-"...bb.bb..bb.bb."],
-dog:[
-"................",
-"......b.b.b.....",
-".....BBBBBBBBB.B",
-"..BBbBBBBBBBBBB.",
-".BkBBbBBBBBBBBB.",
-"kBBBBbBBBBBBBBB.",
-"BkkkkbBBBBBBBBB.",
-".w.w.BBBBBBBBBB.",
-".....BB.BB.BB.BB",
-".....BB.BB.BB.BB",
-".....BB.BB.BB.BB",
-".....bb.bb.bb.bb"],
+const OLD_SPR={
 wolf:[
 "....G.G.............",
 "....GGGG............",
@@ -1459,45 +2115,6 @@ oldman:[
 "....ddddddd..t..",
 "....ddd.ddd..t..",
 "....bbb.bbb..t.."],
-key:[
-"................",
-"................",
-"....yyyy........",
-"...yy..yy.......",
-"...yy..yy.......",
-"....yyyy........",
-".....yy.........",
-".....yy.........",
-".....yyyy.......",
-".....yy.........",
-".....yyyy.......",
-"................"],
-coins:[
-"................",
-"................",
-"................",
-"...YYYY.........",
-"..YyyyyY........",
-".YyyYYyyY..YYYY.",
-".YyYkkYyY.YyyyyY",
-".YyYkkYyY.YYYYYY",
-".YyyYYyyY.YyyyyY",
-"..YyyyyY..YYYYYY",
-"...YYYY...YyyyyY",
-"..........YYYYYY"],
-sun:[
-".......yy.......",
-"...y...yy...y...",
-"....y.YYYY.y....",
-".....YyyyyY.....",
-"....YyyyyyyY....",
-"yyy.YyyyyyyY.yyy",
-"yyy.YyyyyyyY.yyy",
-"....YyyyyyyY....",
-".....YyyyyY.....",
-"....y.YYYY.y....",
-"...y...yy...y...",
-".......yy......."],
 house:[
 "................",
 ".......rr.......",
@@ -1510,19 +2127,6 @@ house:[
 ".wwwwwwbbwwwwww.",
 ".wwwwwwbbwwwwww.",
 ".wwwwwwbbwwwwww.",
-"................"],
-torch:[
-"................",
-".......y........",
-"......yyy.......",
-".....yooyy......",
-".....yoooy......",
-"......ooo.......",
-".......t........",
-".......t........",
-".......t........",
-".......t........",
-"................",
 "................"],
 man:[
 "................",
@@ -1725,10 +2329,10 @@ const STILL=new Set(["house","key","coins","bag","flower","sleeper","seed","spro
 /* sprites that stand on the ground: y (canvas px) their lowest drawn row rests on */
 const GROUNDED={house:120,sleeper:124,sprout:124};
 function drawSprite(name,x,y,scale){
-  const m=SPR[name]; if(!m) return;
+  const m=OLD_SPR[name]; if(!m) return;
   for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){
     const ch=m[r][c]; if(ch===".")continue;
-    cx.fillStyle=PAL[ch]||"#fff";
+    cx.fillStyle=OLD_PAL[ch]||"#fff";
     cx.fillRect(x+c*scale,y+r*scale,scale,scale);
   }
 }
@@ -1736,29 +2340,19 @@ function drawSprite(name,x,y,scale){
 function h2(i,j){ const n=Math.sin(i*127.1+j*311.7)*43758.5453; return n-Math.floor(n); }
 
 let scene={bg:"title",sprite:"torch"}, T=0;
-let shake=0, flash=null;
+let shake=0, flash=null, flashT=0, hitAt=-99;
+/* hit flashes are a dithered screen, not a translucent fill */
+const FLASH={};
+function flashCanvas(c){
+  if(!FLASH[c]){ const p=px(320,150); rect(p,0,0,320,150,c,0); FLASH[c]=toCanvas(p); }
+  return FLASH[c];
+}
 const fx={
-  hitEnemy(){ shake=8; flash="rgba(255,255,255,.25)"; },
-  hitPlayer(){ shake=8; flash="rgba(224,86,107,.3)"; }
+  hitEnemy(){ shake=8; flash="w"; flashT=2; hitAt=T; },
+  hitPlayer(){ shake=8; flash="r"; flashT=3; }
 };
 function setScene(bg,sprite){ scene={bg,sprite}; }
 
-function bgCave(dk){
-  cx.fillStyle=dk?"#0d0a17":"#1c1730"; cx.fillRect(0,0,320,150);
-  cx.fillStyle=dk?"#141021":"#262040";
-  for(let i=0;i<20;i++)for(let j=0;j<6;j++)
-    if(h2(i,j)>.5) cx.fillRect(i*16+((j%2)*8),j*10,14,8);      /* brick wall */
-  cx.fillStyle=dk?"#171226":"#2e2749"; cx.fillRect(0,110,320,40); /* floor */
-  for(let i=0;i<10;i++) if(h2(i,9)>.6){ cx.fillStyle="#3a3154"; cx.fillRect(i*34+6,118+((i%3)*8),10,4); }
-}
-function torchAt(x,y){
-  drawSprite("torch",x,y,2);
-  const fl=reduceMotion?0.5:(0.5+0.18*Math.sin(T/38)+0.07*h2(T>>5,x));
-  const g=cx.createRadialGradient(x+15,y+8,4,x+15,y+8,55);
-  g.addColorStop(0,`rgba(255,179,71,${0.30*fl+0.15})`);
-  g.addColorStop(1,"rgba(255,179,71,0)");
-  cx.fillStyle=g; cx.fillRect(x-45,y-45,120,120);
-}
 function bgForest(){
   cx.fillStyle="#0d1120"; cx.fillRect(0,0,320,150);
   cx.fillStyle="#f2e9d8";
@@ -1789,16 +2383,6 @@ function bgCamp(){
   const g=cx.createRadialGradient(72,118,6,72,118,70);
   g.addColorStop(0,`rgba(255,179,71,${0.25+0.15*fl})`); g.addColorStop(1,"rgba(255,179,71,0)");
   cx.fillStyle=g; cx.fillRect(2,48,140,102);
-}
-function bgOutside(){
-  cx.fillStyle="#7ec8e8"; cx.fillRect(0,0,320,150);
-  cx.fillStyle="#5c5c70"; /* mountains */
-  cx.beginPath(); cx.moveTo(0,120); cx.lineTo(70,55); cx.lineTo(140,120); cx.fill();
-  cx.beginPath(); cx.moveTo(110,120); cx.lineTo(200,40); cx.lineTo(290,120); cx.fill();
-  cx.fillStyle="#8a8a9e";
-  cx.beginPath(); cx.moveTo(240,120); cx.lineTo(300,70); cx.lineTo(340,120); cx.fill();
-  cx.fillStyle="#3f7a44"; cx.fillRect(0,118,320,32);
-  cx.fillStyle="#7ee08a"; for(let i=0;i<20;i++) cx.fillRect(i*17+4,120+(i%3)*6,3,3);
 }
 function bgHome(){
   cx.fillStyle="#33283f"; cx.fillRect(0,0,320,150);         /* wall */
@@ -1937,33 +2521,18 @@ function bgShrine(){
   cx.fillStyle=`rgba(255,179,71,${0.6+0.3*fl})`;
   cx.fillRect(247,86-fl*3,4,7); cx.fillRect(267,90-fl*3,4,7);
 }
-function drawDoors(){
-  cx.fillStyle="#5c4030"; cx.fillRect(50,52,52,62);   /* big door */
-  cx.fillStyle="#3d2b1f"; cx.fillRect(56,58,40,56);
-  cx.fillStyle="#ffd75e"; cx.fillRect(88,86,4,6);
-  cx.fillStyle="#5c4030"; cx.fillRect(226,76,34,38);  /* small door */
-  cx.fillStyle="#3d2b1f"; cx.fillRect(230,80,26,34);
-  cx.fillStyle="#ffd75e"; cx.fillRect(250,94,3,5);
-  cx.fillStyle="#5c4030"; cx.fillRect(140,62,44,52);  /* middle door, hot */
-  const fl=reduceMotion?0.5:(0.5+0.3*Math.sin(T/26));
-  cx.fillStyle=`rgba(224,86,107,${0.5+0.3*fl})`; cx.fillRect(145,67,34,47);
-  cx.fillStyle=`rgba(255,179,71,${0.4+0.3*fl})`; cx.fillRect(151,74,22,40);
-}
-function drawBackdoor(){
-  cx.fillStyle="#2b2344"; cx.fillRect(132,56,58,58);
-  cx.fillStyle="#171226"; cx.fillRect(138,62,46,52);
-  cx.fillStyle="#ffd75e"; cx.fillRect(176,86,4,7);
-  cx.strokeStyle="#4a3f6b"; cx.strokeRect(132.5,56.5,57,57);
-}
-function loop(){
-  T++;
-  const sx = shake>0 ? (Math.random()*shake-shake/2) : 0;
+function loop(now){
+  /* T counts 1/60 s ticks of real time, so animations run at the same speed on any refresh rate */
+  T = now===undefined ? T+1 : Math.floor(now*0.06);
+  /* whole-pixel shake only, so the art never lands between pixels */
+  const sx = (shake>0&&!reduceMotion) ? Math.round(Math.random()*shake-shake/2) : 0;
   if(shake>0) shake-=1;
   cx.save(); cx.translate(sx,0);
-  const b=scene.bg;
-  if(b==="cave"){ bgCave(false); torchAt(18,44); torchAt(282,44); }
-  else if(b==="dark"){ bgCave(true); torchAt(150,40); }
-  else if(b==="battle"){ bgCave(true); torchAt(18,44); torchAt(282,44); }
+  const b=scene.bg, B=BG[b];
+  if(B){
+    cx.drawImage(bgFrame(b,reduceMotion?0:animFrame(B.rate||8,B.frames||1,T),OVERLAY[scene.sprite]&&scene.sprite),0,0);
+    if(B.fx&&!reduceMotion) B.fx(T);
+  }
   else if(b==="forest") bgForest();
   else if(b==="river") bgRiver();
   else if(b==="camp") bgCamp();
@@ -1979,29 +2548,31 @@ function loop(){
   else if(b==="snowcave") bgSnowcave();
   else if(b==="temple") bgTemple();
   else if(b==="shrine") bgShrine();
-  else if(b==="exit"){ bgCave(true);
-    const g=cx.createRadialGradient(160,80,10,160,80,120);
-    g.addColorStop(0,"rgba(255,215,94,.5)"); g.addColorStop(1,"rgba(255,215,94,0)");
-    cx.fillStyle=g; cx.fillRect(0,0,320,150); }
-  else if(b==="outside") bgOutside();
-  else { /* title */ bgCave(false); torchAt(60,50); torchAt(230,50); }
   /* sprite */
   const s=scene.sprite;
-  if(s==="doors") drawDoors();
-  else if(s==="backdoor") drawBackdoor();
-  else if(s==="firedoor"){ drawDoors(); }
+  if(B&&(OVERLAY[s]||B.owns===s)){ /* baked into the background */ }
   else if(s==="torch"){ /* title torches already drawn */ }
   else if(s==="captain" && b==="sea"){ /* drawn aboard the boat by bgSea */ }
   else if(s && SPR[s]){
+    const a=sprite(C&&SPR[s+"_fight"]?s+"_fight":s), since=T-hitAt;
+    let img=a.anim[reduceMotion?0:animFrame(a.rate,a.anim.length,T)], kx=0;
+    if(C&&a.hit&&since<24){                       /* combat hit reaction */
+      img=since<3?a.white:a.hit;
+      if(!reduceMotion) kx=Math.round(Math.max(0,8-since)*0.75);
+    }
+    const y=a.float?Math.round(((B&&B.sky)||70)-a.h/2):(B?B.ground:124)-a.h;
+    cx.drawImage(img,Math.round(160-a.w/2)+kx,y);
+  }
+  else if(s && OLD_SPR[s]){
     const bob=(reduceMotion||STILL.has(s))?0:Math.round(Math.sin(T/18)*2);
     const scale = C?7:6;
-    const w=SPR[s][0].length*scale;
+    const w=OLD_SPR[s][0].length*scale;
     let y=(C?24:36)+bob;
-    if(GROUNDED[s]){ const rows=SPR[s].findLastIndex(r=>/[^.]/.test(r))+1; y=GROUNDED[s]-rows*scale; }
+    if(GROUNDED[s]){ const rows=OLD_SPR[s].findLastIndex(r=>/[^.]/.test(r))+1; y=GROUNDED[s]-rows*scale; }
     drawSprite(s,160-w/2,y,scale);
   }
   cx.restore();
-  if(flash){ cx.fillStyle=flash; cx.fillRect(0,0,320,150); flash=null; }
+  if(flash){ cx.drawImage(flashCanvas(flash),0,0); if(--flashT<=0) flash=null; }
   requestAnimationFrame(loop);
 }
 
