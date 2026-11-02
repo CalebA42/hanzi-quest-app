@@ -295,7 +295,7 @@ ruby rt{
   <div id="about-panel">
     <div class="about-title">汉字冒险 · Hanzi Quest</div>
     <div class="about-ver" id="about-ver"></div>
-    <div class="about-sub">8-bit Mandarin adventure</div>
+    <div class="about-sub">16-bit Mandarin adventure</div>
     <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app">⌂ GitHub Repository →</button>
     <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app/releases">↓ Download for Offline Play →</button>
     <button class="about-link" data-url="https://github.com/CalebA42/hanzi-quest-app/issues">✎ Bug Reports &amp; Feedback →</button>
@@ -1302,7 +1302,7 @@ function showTitle(){
   stage.innerHTML="";
   const c=document.createElement("div"); c.className="center";
   const t=document.createElement("div"); t.id="bigtitle"; t.textContent="汉字冒险";
-  const st=document.createElement("div"); st.className="subtitle"; st.textContent="HANZI QUEST · 8-BIT MANDARIN";
+  const st=document.createElement("div"); st.className="subtitle"; st.textContent="HANZI QUEST · 16-BIT MANDARIN";
   c.append(t,st);
   const save=loadGame();
   c.appendChild(menuBtn("开始","NEW GAME — pick a level",showLevels));

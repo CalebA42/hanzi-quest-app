@@ -1,6 +1,6 @@
 # 汉字冒险 · Hanzi Quest
 
-An 8-bit Mandarin reading adventure across HSK levels 1–6.
+A 16-bit Mandarin reading adventure across HSK levels 1–6.
 
 ## Play now (no download required)
 
