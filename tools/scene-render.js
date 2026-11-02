@@ -69,7 +69,7 @@ function loadArt(src) {
   };
   vm.createContext(ctx);
   vm.runInContext("var C=null;" + art + `
-    ;this.A={PAL,SPR,OLD_PAL,OLD_SPR,BG,OVERLAY,RGB,sprFrame,outline,px,stamp,setScene,loop,fx,
+    ;this.A={PAL,SPR,BG,OVERLAY,RGB,sprFrame,outline,px,stamp,setScene,loop,fx,
       setC:v=>{C=v}, reset:()=>{T=0;hitAt=-99;shake=0;flash=null;}};`, ctx);
   const A = ctx.A;
   /* draw one scene; ticks = frames to advance, hit = enemy was just hit (combat) */

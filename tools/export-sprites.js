@@ -110,19 +110,6 @@ const bgCards = Object.keys(A.BG).map(bg => {
   return `<figure class="scene bgcard"><img src="${uri(A.render(bg, B.owns || null))}" width="320" height="150" alt=""><figcaption><b>${esc(bg)}</b> · ${esc(extra)}</figcaption></figure>`;
 }).join("\n");
 
-/* ---- 1.x sprites not yet redrawn ---- */
-function oldSvg(name, scale) {
-  const m = A.OLD_SPR[name], w = m[0].length, h = m.length;
-  let rects = "";
-  m.forEach((row, r) => [...row].forEach((ch, c) => {
-    if (ch !== ".") rects += `<rect x="${c}" y="${r}" width="1.04" height="1.04" fill="${A.OLD_PAL[ch] || "#fff"}"/>`;
-  }));
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges">${rects}</svg>`;
-}
-const oldNames = Object.keys(A.OLD_SPR).filter(n => !A.SPR[n]);
-const oldCards = oldNames.map(name =>
-  `<section class="card old"><h2>${esc(name)} <small>1.x</small></h2>${oldSvg(name, 8)}<ul>${whereList(name)}</ul></section>`).join("\n");
-
 const legend = Object.entries(A.PAL).map(([k, v]) =>
   `<span class="sw"><i style="background:${v}"></i><code>${esc(k)}</code> ${v}</span>`).join("");
 
@@ -159,10 +146,9 @@ ul{margin:0;padding-left:18px;font-size:13px}
 ul span{color:#9a93ad;font-size:12px}
 .none{color:#e0a05e;font-size:13px}
 .warn{color:#ff8a8a;font-size:13px;margin:8px 0}
-.old svg{background:#1c1730;padding:6px;border-radius:4px;max-width:100%;height:auto}
 </style></head><body>
 <h1>Hanzi Quest sprites</h1>
-<p class="meta">${v2names.length} redrawn sprites · ${oldNames.length} still 1.x · game version ${esc(VERSION)} · exported ${TODAY}</p>
+<p class="meta">${v2names.length} redrawn sprites · game version ${esc(VERSION)} · exported ${TODAY}</p>
 <div class="legend">${legend}</div>
 <h3>Sprites</h3>
 <div class="grid">
@@ -173,7 +159,6 @@ ${overlayCards}
 <div class="bggrid">
 ${bgCards}
 </div>
-${oldNames.length ? `<h3>Not yet redrawn (1.x art)</h3>\n<div class="grid">\n${oldCards}\n</div>` : ""}
 </body></html>
 `;
 
