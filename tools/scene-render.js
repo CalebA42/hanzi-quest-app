@@ -15,8 +15,8 @@ function parseColor(s) {
   return [v[0], v[1], v[2], v[3] ?? 1];
 }
 
-/* just enough of canvas 2D for the game's renderer: fillRect, drawImage,
-   putImageData, translate. Gradients and paths (1.x art only) are skipped. */
+/* just enough of canvas 2D for the game's renderer: fillRect (the per-tick
+   effects), drawImage, createImageData/putImageData, translate (screen shake) */
 function makeCanvas(w = 300, h = 150) {
   const c = { _w: w, _h: h, data: new Uint8ClampedArray(w * h * 4) };
   const resize = () => { c.data = new Uint8ClampedArray(c._w * c._h * 4); };
@@ -29,16 +29,13 @@ function makeCanvas(w = 300, h = 150) {
     d[k] = r * a + d[k] * (1 - a); d[k + 1] = g * a + d[k + 1] * (1 - a); d[k + 2] = b * a + d[k + 2] * (1 - a); d[k + 3] = 255;
   };
   const ctx = {
-    fillStyle: "#000", strokeStyle: "#000", imageSmoothingEnabled: true,
+    fillStyle: "#000", imageSmoothingEnabled: true,
     save() { stack.push(tx); }, restore() { tx = stack.pop() || 0; }, translate(x) { tx += x; },
     fillRect(x, y, w, h) {
-      if (typeof ctx.fillStyle !== "string") return;
       const [r, g, b, a] = parseColor(ctx.fillStyle);
       for (let j = Math.round(y); j < Math.round(y + h); j++)
         for (let i = Math.round(x + tx); i < Math.round(x + tx + w); i++) blend(i, j, r, g, b, a);
     },
-    strokeRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, fill() {},
-    createRadialGradient() { return { addColorStop() {} }; },
     createImageData(w, h) { return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }; },
     putImageData(im, x, y) {
       for (let j = 0; j < im.height; j++) for (let i = 0; i < im.width; i++)
@@ -70,7 +67,7 @@ function loadArt(src) {
   vm.createContext(ctx);
   vm.runInContext("var C=null;" + art + `
     ;this.A={PAL,SPR,BG,OVERLAY,RGB,sprFrame,outline,px,stamp,setScene,loop,fx,
-      setC:v=>{C=v}, reset:()=>{T=0;hitAt=-99;shake=0;flash=null;}};`, ctx);
+      setC:v=>{C=v}, reset:()=>{T=0;hitAt=-99;shakeEnd=0;flash=null;}};`, ctx);
   const A = ctx.A;
   /* draw one scene; ticks = frames to advance, hit = enemy was just hit (combat) */
   A.render = (bg, sprite, { fight = false, hit = false, ticks = 1 } = {}) => {

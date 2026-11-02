@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* Export every sprite and background into a review sheet: each sprite's
-   frames enlarged (idle loop, combat hit, fight-size art), the real scenes
-   it appears in, a see-through check, and every background.
+   frames enlarged (idle loop, combat hit, fight-size art, per-background
+   versions), the real scenes it appears in, a see-through check, and every
+   background.
 
    Usage:  node tools/export-sprites.js
    Output: review/hanzi-quest-sprites.html  (open in a browser)
@@ -65,8 +66,10 @@ function holes(p) {
 const frameFig = (p, label, cls = "", S = p.w > 44 ? 2 : 3) =>
   `<figure class="frame ${cls}"><img src="${uri(bufRGBA(A, p))}" width="${p.w * S}" height="${p.h * S}" alt=""><figcaption>${esc(label)}</figcaption></figure>`;
 
-/* ---- v2 sprites ---- */
-const v2names = Object.keys(A.SPR).filter(n => !n.endsWith("_fight"));
+/* ---- sprites (fight art and per-background versions go on their main sprite's card) ---- */
+const variantsOf = name => Object.keys(A.BG).filter(bg => A.SPR[name + "_" + bg]);
+const isExtra = n => n.endsWith("_fight") || Object.keys(A.SPR).some(b => Object.keys(A.BG).some(bg => n === b + "_" + bg));
+const v2names = Object.keys(A.SPR).filter(n => !isExtra(n));
 const v2cards = v2names.map(name => {
   const figs = [], warn = [];
   const addFrames = (key, tag) => {
@@ -81,11 +84,10 @@ const v2cards = v2names.map(name => {
   };
   addFrames(name, "");
   if (A.SPR[name + "_fight"]) addFrames(name + "_fight", "fight · ");
+  for (const bg of variantsOf(name)) addFrames(name + "_" + bg, bg + " · ");
   const base = A.SPR[name], size = `${base.base[0].length + 2}×${base.base.length + 2}`;
   const shots = [...(scenes[name] || new Map()).values()].map(({ bg, fight }) =>
-    A.BG[bg]
-      ? `<figure class="scene"><img src="${uri(A.render(bg, name, { fight }))}" width="320" height="150" alt=""><figcaption>${esc(bg)}${fight ? " · fight" : ""}</figcaption></figure>`
-      : `<p class="none">${esc(bg)}: background not redrawn yet</p>`).join("");
+    `<figure class="scene"><img src="${uri(A.render(bg, name, { fight }))}" width="320" height="150" alt=""><figcaption>${esc(bg)}${fight ? " · fight" : ""}</figcaption></figure>`).join("");
   return `<section class="card" id="${esc(name)}">
 <h2>${esc(name)} <small>${size}${base.float ? " · presented" : ""}${A.SPR[name + "_fight"] ? " · has fight art" : ""}</small></h2>
 <div class="frames">${figs.join("")}</div>
@@ -130,7 +132,7 @@ h3{margin:28px 0 12px;font-size:18px}
 .card{background:#1f1a2e;border-radius:10px;padding:14px;min-width:0}
 .card h2{margin:0 0 10px;font-size:17px;font-family:ui-monospace,monospace}
 .card h2 small{font:12px system-ui,sans-serif;color:#9a93ad;margin-left:6px}
-img,svg{image-rendering:pixelated}
+img{image-rendering:pixelated}
 .frames{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .frame img{max-width:100%;height:auto;background-color:#2a2440;
   background-image:linear-gradient(#ffffff10 1px,transparent 1px),linear-gradient(90deg,#ffffff10 1px,transparent 1px);
@@ -148,7 +150,7 @@ ul span{color:#9a93ad;font-size:12px}
 .warn{color:#ff8a8a;font-size:13px;margin:8px 0}
 </style></head><body>
 <h1>Hanzi Quest sprites</h1>
-<p class="meta">${v2names.length} redrawn sprites · game version ${esc(VERSION)} · exported ${TODAY}</p>
+<p class="meta">${v2names.length} sprites · game version ${esc(VERSION)} · exported ${TODAY}</p>
 <div class="legend">${legend}</div>
 <h3>Sprites</h3>
 <div class="grid">

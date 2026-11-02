@@ -1037,7 +1037,7 @@ const LEVELS = {
     text:[L("镜子|里|，|你|看见|了|自己|——|还有|这|一路|上|你|见|过|的|朋友们|："),
           L("山洞|里|的|猫|、|森林|里|的|老人|、|小城|里|的|男人|、|海上|的|船长|、|雪山|上|的|雪怪|……")],
     choices:[{t:L("我|明白|了|。"),next:"win6"}]},
-  win6:{bg:"shrine",sprite:"sun",victory:true,
+  win6:{bg:"shrine",sprite:"gongxi",victory:true,
     text:[L("真正|的|宝藏|，|是|你|一路|上|帮助|过|的|人|，|和|你|学|到|的|东西|。"),
           L("恭喜|你|！|你|完成|了|汉字|冒险|的|全部|六关|！"),
           L("你|已经|从|第一关|走|到|了|第六关|！|你|真|了不起|！")],
@@ -1358,7 +1358,9 @@ document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".w,.item")) t
 <script>
 /* ============================================================
    PIXEL ART — canvas backgrounds, sprites, animation loop
-   Sprites are tiny char-map strings; '.'=transparent.
+   Everything is drawn once into indexed pixel buffers (one master palette),
+   cached as canvases, and copied to the 320x150 view with drawImage.
+   Sprites are char maps ('.' = transparent); backgrounds are drawn by code.
    ============================================================ */
 const cv=$("#view"), cx=cv.getContext("2d");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1464,7 +1466,9 @@ function toCanvas(p){
    hit   = combat hit-reaction patch
    rate  = ticks (1/60 s) per idle frame, or a list with one hold time per frame
    float = presented in mid-air (items) instead of standing on the ground line
-   NAME_fight = larger art used in combat, if the enemy has it */
+   sky   = a floating item centered on the background's sky line (the sun) instead of y 70
+   NAME_fight = larger art used in combat, if the enemy has it
+   NAME_bg    = a version used only on that background (yeti_village) */
 const SPR={
 rat:{rate:[150,70,150,12],
 base:[
@@ -3243,7 +3247,67 @@ base:[
 "......................333222222222222222..................333222222222222222......................",
 "..........................333333333...........................333333333..........................."],
 anim:[{},{17:[37,"LLL555555555554444444LLL"],18:[37,"LLLLLLL5555554444LLLLLLL"],19:[37,"LLLLLLLLL55444LLLLLLLLLL"],20:[40,"LLLLLL44444LLLLLL"],21:[51,"L"],47:[47,"yyy"],48:[45,"yyyyyyy"],49:[44,"yyy1111yy"],50:[44,"yy111111yy"],51:[43,"yy11yyy11yy"],52:[43,"yy11yLLy11y"],53:[43,"yy11yLyy11y"],54:[44,"y111yy11yy"],55:[44,"yy111111yy"],56:[45,"yyy11yyy"],57:[46,"yyyyyy"]}],
-hit:{0:[4,"........................................................................................."],1:[3,"..........................................................................................."],2:[2,"............................................................................................."],3:[1,"..............................................nnnnnnnnnnnnn...................................."],4:[1,"...........................................EEEEEEEEEEEEnnnnnnnn................................"],5:[1,".........................................nEEEEEEEEEEEEEEn2nnnnnn................................"],6:[1,".........................................nnEEEEEEEEEEEEnn2nnnnnnn..............................."],7:[1,".........................................nnnnnnnnnnnnnnnn22nnnnn................................"],8:[1,".......................................444nnnnnnnnnnnnnnnn2nnnn..............................."],9:[1,"......................................4445n666nnnnnnnnnnnn22n333............................."],10:[2,"....................................44456n66666555554444442n433............................."],11:[2,"...................................444556666666555555444442243..............................."],12:[3,"..................................445556666665555555444444244.............................."],13:[4,"................................44355555555555555555555552555533........................."],14:[5,"...............................44333333333333333333333333233333......................."],15:[5,"...............................444333333333333333333333332333333....................."],16:[4,"................................444333333333333333333333332233333......................"],17:[4,"................................444455555555555555444444444443333........................."],18:[3,".................................444444222222255554442222222443333........................."],19:[3,".................................444444222222255444442222222443333........................."],20:[3,".................................444444444444444444444444444443333........................."],21:[3,".................................344444444444444444444444444433333........................."],22:[3,".................................344444444444444444444444444433333........................."],23:[3,".................................33444444444444444444444444433333.........................."],24:[4,".................................3344444444442222222222222333333.........................."],25:[4,".................................3334444442222222222222222222333.........................."],26:[4,".....nEEEEEEnnnnn.................33344442222222222222222222222............EEEEEEEnnnnn.."],27:[5,"..EEEEEEEEEEEnnnnnn...............333342222222222222222222222..........nEEEEEEEEEEEnnnnn"],28:[6,"nEEEEEEEEEEEEnnnnnn...............3333222222222222222222222..........nEEEEEEEEEEEEnnnnn"],29:[7,"nEEEEEEEEEEnnnnnnn................33332222222222222222222..........4nnEEEEEEEEEEnnnnn"],30:[8,"nnnnnnnnnnnnnnnn............444444333322222222222....22..........445nnnnnnnnnnnnnnn"],31:[40,"44443333222222222....22"],32:[42,"44443333333333333"],33:[47,"4423333"],47:[7,"2444443322222222225525555555555555522211333111224444444444424444443333322222444433"],48:[6,"2224444443222222255552255555555555552213333333112244444444442444444333333324444444433"],49:[5,"22225444444333444445555255555555555522133311113311224444444442444444333333344555444443"],50:[5,"42265554444334444445555255555555555521133111111331224444444442444444333333446665544444"],51:[4,"456666555444433444444555255555555555521331133311331224444444442444444333333456665554444"],52:[4,"4566665554444.2.44444455225555555555221331133331131124444444422444444333334556665554444"],53:[4,"455555555444422244444445525555555555221331133331131224444444424444444333334555555555444433"],54:[3,"44555555554444.2.44444444425555555555521131113311331224444444424444444333334555555555444433"],55:[3,"4455555555444443344444444424555555555522133111111331224444444424444444333334455555554444433"],56:[3,"4445555554444443344444444422444555555522113331133312244444444424444444333334455555554444433"],57:[3,"4444555554444443344444444442444444444442211333333112244444444424444443333334445555544444433"],58:[3,"4444444444444443344444444442444444444444221111111222444444444224444443333334444444444444433"],59:[3,"3444444444444433344444444442444444444444422221222224444444444244444443333334444444444444433"],60:[4,"444444444444433344444444442244444444444442222222444444444444244444433333333444444444444333"],61:[4,"344444222222433444444444444244444444444444444444444444444444244444333333333444444222222333"],62:[4,"34442222222222334444444444424444444444444444444444444444444424444433333333334442222222222"],63:[5,"3442222222222233444444444424444444444444444444444444444444444444333333333333422222222222"],64:[5,"33222222222222333444444444224444444444442222222222222222222224433333333333.332222222..2"],65:[6,"3322222222222333344444444422444444422222222222222222222222222222333333333233222222"],66:[7,"3322222222222333344444444422444222222222222222222222222222222222223333322233222222"],67:[7,"444433.22222233333444444444222222222222222222222222222222222222222223322222.3444433"],68:[4,"44444444422222222333333444444422222222222222222222222222222222222222222232222444444444433"],69:[2,"44455555444.223322223333334444422222222222222222222222222222222222222222222224445555444444433"],70:[1,"4456666555444444332223333.2.344422222222222222222222222222222222222222...2222446666655544444433"],71:[0,"445566665555444444332..333222333322222222222222222222222222222222222222.....244566666555544444433"],72:[0,"44555555555554444433....33.23333322222222222222222222222222222222222222......44555555555544444433"],73:[0,"445555555555444444433....33333333222222222222222222222222222222222222222....4445555555555444444333"],74:[0,"444555355533444344433......33333332222222222222222222222222222222222222.....4445555355535444344333"],75:[0,"444455355533444344333.......333333332222222222222222222222222222222222......3444455355534444344333"],76:[0,"444444344433444344333.........33333333222222222222222222222222222222........34444443444344443443"],77:[0,"344444344433444344333.........43333333332222222222222222222222222222.........444444344434444343"],78:[0,"34444434443322234...3.......44444433333333332222222222222222222222443........344444344232222343"],79:[1,"3344422222222222..........4444444443333333333333333333333333..4444443........344442222222222222"],80:[2,"334222222222222.........446655544444333333333333333333334665554444443.......333422222222222222"],81:[3,"332222222222222.......4466665554444433.....333333....4466665554444433........33...2222222222"],82:[4,"3332222222222........4566665555444443...............45666655554444433............22222222"],83:[7,"3333333..........445566655554444433.............445566655554444433...........3333333"]}}
+hit:{0:[4,"........................................................................................."],1:[3,"..........................................................................................."],2:[2,"............................................................................................."],3:[1,"..............................................nnnnnnnnnnnnn...................................."],4:[1,"...........................................EEEEEEEEEEEEnnnnnnnn................................"],5:[1,".........................................nEEEEEEEEEEEEEEn2nnnnnn................................"],6:[1,".........................................nnEEEEEEEEEEEEnn2nnnnnnn..............................."],7:[1,".........................................nnnnnnnnnnnnnnnn22nnnnn................................"],8:[1,".......................................444nnnnnnnnnnnnnnnn2nnnn..............................."],9:[1,"......................................4445n666nnnnnnnnnnnn22n333............................."],10:[2,"....................................44456n66666555554444442n433............................."],11:[2,"...................................444556666666555555444442243..............................."],12:[3,"..................................445556666665555555444444244.............................."],13:[4,"................................44355555555555555555555552555533........................."],14:[5,"...............................44333333333333333333333333233333......................."],15:[5,"...............................444333333333333333333333332333333....................."],16:[4,"................................444333333333333333333333332233333......................"],17:[4,"................................444455555555555555444444444443333........................."],18:[3,".................................444444222222255554442222222443333........................."],19:[3,".................................444444222222255444442222222443333........................."],20:[3,".................................444444444444444444444444444443333........................."],21:[3,".................................344444444444444444444444444433333........................."],22:[3,".................................344444444444444444444444444433333........................."],23:[3,".................................33444444444444444444444444433333.........................."],24:[4,".................................3344444444442222222222222333333.........................."],25:[4,".................................3334444442222222222222222222333.........................."],26:[4,".....nEEEEEEnnnnn.................33344442222222222222222222222............EEEEEEEnnnnn.."],27:[5,"..EEEEEEEEEEEnnnnnn...............333342222222222222222222222..........nEEEEEEEEEEEnnnnn"],28:[6,"nEEEEEEEEEEEEnnnnnn...............3333222222222222222222222..........nEEEEEEEEEEEEnnnnn"],29:[7,"nEEEEEEEEEEnnnnnnn................33332222222222222222222..........4nnEEEEEEEEEEnnnnn"],30:[8,"nnnnnnnnnnnnnnnn............444444333322222222222....22..........445nnnnnnnnnnnnnnn"],31:[40,"44443333222222222....22"],32:[42,"44443333333333333"],33:[47,"4423333"],47:[7,"2444443322222222225525555555555555522211333111224444444444424444443333322222444433"],48:[6,"2224444443222222255552255555555555552213333333112244444444442444444333333324444444433"],49:[5,"22225444444333444445555255555555555522133311113311224444444442444444333333344555444443"],50:[5,"42265554444334444445555255555555555521133111111331224444444442444444333333446665544444"],51:[4,"456666555444433444444555255555555555521331133311331224444444442444444333333456665554444"],52:[4,"4566665554444.2.44444455225555555555221331133331131124444444422444444333334556665554444"],53:[4,"455555555444422244444445525555555555221331133331131224444444424444444333334555555555444433"],54:[3,"44555555554444.2.44444444425555555555521131113311331224444444424444444333334555555555444433"],55:[3,"4455555555444443344444444424555555555522133111111331224444444424444444333334455555554444433"],56:[3,"4445555554444443344444444422444555555522113331133312244444444424444444333334455555554444433"],57:[3,"4444555554444443344444444442444444444442211333333112244444444424444443333334445555544444433"],58:[3,"4444444444444443344444444442444444444444221111111222444444444224444443333334444444444444433"],59:[3,"3444444444444433344444444442444444444444422221222224444444444244444443333334444444444444433"],60:[4,"444444444444433344444444442244444444444442222222444444444444244444433333333444444444444333"],61:[4,"344444222222433444444444444244444444444444444444444444444444244444333333333444444222222333"],62:[4,"34442222222222334444444444424444444444444444444444444444444424444433333333334442222222222"],63:[5,"3442222222222233444444444424444444444444444444444444444444444444333333333333422222222222"],64:[5,"33222222222222333444444444224444444444442222222222222222222224433333333333.332222222..2"],65:[6,"3322222222222333344444444422444444422222222222222222222222222222333333333233222222"],66:[7,"3322222222222333344444444422444222222222222222222222222222222222223333322233222222"],67:[7,"444433.22222233333444444444222222222222222222222222222222222222222223322222.3444433"],68:[4,"44444444422222222333333444444422222222222222222222222222222222222222222232222444444444433"],69:[2,"44455555444.223322223333334444422222222222222222222222222222222222222222222224445555444444433"],70:[1,"4456666555444444332223333.2.344422222222222222222222222222222222222222...2222446666655544444433"],71:[0,"445566665555444444332..333222333322222222222222222222222222222222222222.....244566666555544444433"],72:[0,"44555555555554444433....33.23333322222222222222222222222222222222222222......44555555555544444433"],73:[0,"445555555555444444433....33333333222222222222222222222222222222222222222....4445555555555444444333"],74:[0,"444555355533444344433......33333332222222222222222222222222222222222222.....4445555355535444344333"],75:[0,"444455355533444344333.......333333332222222222222222222222222222222222......3444455355534444344333"],76:[0,"444444344433444344333.........33333333222222222222222222222222222222........34444443444344443443"],77:[0,"344444344433444344333.........43333333332222222222222222222222222222.........444444344434444343"],78:[0,"34444434443322234...3.......44444433333333332222222222222222222222443........344444344232222343"],79:[1,"3344422222222222..........4444444443333333333333333333333333..4444443........344442222222222222"],80:[2,"334222222222222.........446655544444333333333333333333334665554444443.......333422222222222222"],81:[3,"332222222222222.......4466665554444433.....333333....4466665554444433........33...2222222222"],82:[4,"3332222222222........4566665555444443...............45666655554444433............22222222"],83:[7,"3333333..........445566655554444433.............445566655554444433...........3333333"]}},
+gongxi:{rate:[150,8,8,8,8],float:true,sky:true,
+base:[
+"..................................................YYYYYYYY..................................................",
+".........................................YYYYYYYYYYYY..YYYYYYYYYYYY.........................................",
+"................................YYYYYYYYY..........................YYYYYYYY.................................",
+"........................YYYYYY................................................YYYYYY........................",
+"YY.............YYYY......................................................................YYYY.............yY",
+"YYttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttYY",
+"YYBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBYY",
+"YYBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBYY",
+"YY.RpprrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRR.YY",
+"...RpprrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRR...",
+"...RppYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrLLLrrrrLLLrrrrrrrrrrrrrrrrrrrLLrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrryyyRrrryyyRrrrrrrrrrrrrrrrrrLyyRrrrrrrrrrrrrrrrrrLLLrrLLLLrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrryyyRrrryyyRrrrrrrrrrLLLLLLLLyyyLLLLLLLLLrrrrrrrrryyYRryyyRRrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrLLLLyyyLLLLyyyLLLLrrrrrrYYYYYYYYyyyYYYYYYYYYRrrrrrrrLyyRRryyyRrrrrrrrrrrrrLLLLrrrrrrrYrRR...",
+"...RppYrrrrrrrrryyyyyyyyyyyyyyyyyyRrrrrrrRRRRRRRyyyRRRRRRRRRRrrrrrrryyyRrLyyyRrrrrrrrrrrrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrrrYYYYyyyYYYYyyyYYYYRrrrrrrLLLLLLLyyyLLLLLLLLrrrrrrrrLyyYRryyyyLLLLLLLLLLrrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrrrrRRRyyyRRRRyyyRRRRRrrrrrrYYYYYYYYYYYYYYYYYYRrrrrrrryyyRRryyyyyyyyyyyyyyRrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrryyyRrrryyyRrrrrrrrrrrrRRRRRRRRRRRRRRRRRRrrrrrrLyyyRrLyyYYYyyyYYYyyyRrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrLLLLLLyyyLLLLyyyLLLLLLrrrrrrLLLLLLLLLLLLLLLLrrrrrrrLyyyyRLyyYRRRyyyRRRyyyRrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrYyyyyyyyyyyyyyyyyyyyyyRrrrrryyyYYYYYYYYYYyyyRrrrrrryyyyyRYyyRRrryyyRrryyYRrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrrYYYyyyyYYYYYYyyyyYYYYRrrrrryyyRRRRRRRRRRyyyRrrrrrLyyyyyRrYYRrrryyyRrrYYRRrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrrrRRyyyYRRRRRRYyyyRRRRRrrrrrYyyLLLLLLLLLLyyyRrrrrrrYYyyyRrrRRrrryyyRrrrRRrrrYyyYRrrrrrrYrRR...",
+"...RppYrrrrrrrrrrLyyYRRrrrrrrYyyLrrrrrrrrrrYyyyYYYYYYyyyYYRrrrrrrrRyyyRrrrLLLryyyRLLLrrrrrryyRRrrrrrrYrRR...",
+"...RppYrrrrrrrrrLyyYRRLLLrrrrryyyLLrrrrrrrrryyyRRRRRRyyyRRRrrrrrrrryyyRrrryyYRyyyRYyyRrrrrryyRrrrrrrrYrRR...",
+"...RppYrrrrrrrLLyyyRRryyyRrrrryyyyyLrrrLLLLLyyyLLLLLLyyyLLLLLrrrrrryyyRrrLyyRRyyyRryyLrrrrryyRrrrrrrrYrRR...",
+"...RppYrrrrrrrYyYYyLrryyyRLLrLyyyYyRRrrYYYYYYYYYYYYYYYYYYYYYYRrrrrryyyRrryyyRryyyRryyyRrrrrYYRrrrrrrrYrRR...",
+"...RppYrrrrrrrrYRRyyLryyyRyyRYyyyRYRrrrrRRRRRRRRRRRRRRRRRRRRRRrrrrryyyRrryyYRryyyRrYyyRrrrrrRRrrrrrrrYrRR...",
+"...RppYrrrrrrrrrRLyyRRyyyRyyRrYyyRrRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrryyyRrLyyRRryyyRrryyLrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrLyyYRryyyRyyLrryyLrrrrrrrrLLLLLLLLLLLLLLLLrrrrrrrrryyyRryyYRrryyyRrryyyRrrLLLLrrrrrrrYrRR...",
+"...RppYrrrrrrrrrYyYRRryyyRYyyRrYyyRrrrrrrryyyYYYYYYYYYYyyyRrrrrrrrryyyRrYYRRrryyyRrrYYYRrryyyyRrrrrrrYrRR...",
+"...RppYrrrrrrrrrrYRRrryyyRrYYRrrYYRrrrrrrryyyRRRRRRRRRRyyyRrrrrrrrryyyRrrRRrrryyyRrrrRRRrrYyyYRrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrRLLLyyYRrrRRrrrRRrrrrrrryyyLLLLLLLLLLyyyRrrrrrrrryyyRrrrrrLLyyyRrrrrrrrrrYYRRrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrryyyYRRrrrrrrrrrrrrrrrryyyYYYYYYYYYYyyyRrrrrrrrryyyRrrrrryyyYYRrrrrrrrrrrRRrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrYYYRRrrrrrrrrrrrrrrrrrYYYRRRRRRRRRRYYYRrrrrrrrrYYYRrrrrrYYYRRRrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrRRRrrrrrrrrrrrrrrrrrrrRRRrrrrrrrrrrRRRrrrrrrrrrRRRrrrrrrRRRrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrYrRR...",
+"...RppYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYrRR...",
+"...RpprrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRR...",
+"...RpprrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRR...",
+"...RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR...",
+".....YY..............................................................................................YY.....",
+".....YY..............................................................................................YY.....",
+"....prrr............................................................................................prrr....",
+"....prrr............................................................................................prrr....",
+"....prrr............................................................................................prrr....",
+"....prrr............................................................................................prrr...."],
+anim:[{},{16:[20,"www"],17:[20,"LLL"],18:[20,"LL"],19:[16,"wwwwLL"],20:[16,"LLLLL"],21:[16,"LLLLL"],24:[14,"wwwww"],25:[14,"LLLLL"],26:[15,"LLL"],29:[16,"w"],30:[14,"ww"],31:[14,"LL"]},
+  {16:[49,"ww"],17:[48,"wLL"],18:[47,"wLLLw"],19:[46,"LLLLLL"],20:[48,"LLL"],21:[45,"wwwLLL"],22:[45,"LLLLL"],24:[44,"wwwww"],25:[43,"LLLLLL"],26:[43,"LL"],27:[42,"LLLwww"],28:[43,"LLLL"],29:[44,"LLL"],30:[41,"wwwLL"],31:[40,"LLLLLL"],34:[42,"ww"],35:[42,"LL"],36:[42,"L"],37:[42,"L"]},
+  {17:[77,"w"],19:[76,"L"],20:[76,"L"],21:[75,"LLwwww"],22:[75,"LLLLL"],23:[74,"LLLLLL"],24:[74,"LRRRL"],25:[73,"LRRrrL"],26:[73,"L"],28:[74,"www"],29:[74,"LLL"],30:[73,"wLL"],31:[73,"LLL"],32:[73,"LL"],33:[69,"LRrwLL"],34:[69,"LRrLL"],35:[68,"LLRrLL"],36:[68,"LL"],37:[67,"LLL"],38:[67,"LLL"],39:[67,"LLL"]},
+  {}]}
 };
 function sprFrame(s,patch){
   const m=s.base.map((row,r)=>{ const q=patch&&patch[r]; if(!q) return row;
@@ -4112,7 +4176,7 @@ BG.temple={ground:134,frames:4,rate:40,draw:f=>{
   for(let i=0;i<10;i++){ const x=Math.floor(hash(i,100)*320), y=121+Math.floor(hash(i,101)*28); rect(p,x,y,3,1,"4"); }
   return p;
 }};
-BG.shrine={ground:132,frames:3,rate:30,draw:f=>{
+BG.shrine={ground:132,sky:40,frames:3,rate:30,draw:f=>{
   const p=px(320,150);
   /* dark wooden hall: plank walls, painted beams, red pillars */
   rect(p,0,0,320,112,"b");
@@ -4150,7 +4214,8 @@ BG.shrine={ground:132,frames:3,rate:30,draw:f=>{
 
 
 let scene={bg:"title",sprite:"torch"}, T=0;
-let shake=0, flash=null, flashT=0, hitAt=-99;
+/* hit effects end at a tick of T, so they last as long on a 144 Hz screen as on a 60 Hz one */
+let shakeEnd=0, flash=null, flashEnd=0, hitAt=-99;
 /* hit flashes are a dithered screen, not a translucent fill */
 const FLASH={};
 function flashCanvas(c){
@@ -4158,8 +4223,8 @@ function flashCanvas(c){
   return FLASH[c];
 }
 const fx={
-  hitEnemy(){ shake=8; flash="w"; flashT=2; hitAt=T; },
-  hitPlayer(){ shake=8; flash="r"; flashT=3; }
+  hitEnemy(){ shakeEnd=T+8; flash="w"; flashEnd=T+2; hitAt=T; },
+  hitPlayer(){ shakeEnd=T+8; flash="r"; flashEnd=T+3; }
 };
 function setScene(bg,sprite){ scene={bg,sprite}; }
 
@@ -4167,8 +4232,8 @@ function loop(now){
   /* T counts 1/60 s ticks of real time, so animations run at the same speed on any refresh rate */
   T = now===undefined ? T+1 : Math.floor(now*0.06);
   /* whole-pixel shake only, so the art never lands between pixels */
+  const shake=Math.max(0,shakeEnd-T);
   const sx = (shake>0&&!reduceMotion) ? Math.round(Math.random()*shake-shake/2) : 0;
-  if(shake>0) shake-=1;
   cx.save(); cx.translate(sx,0);
   const b=scene.bg, B=BG[b];
   if(B){
@@ -4191,7 +4256,7 @@ function loop(now){
     cx.drawImage(img,Math.round(160-a.w/2)+kx,y);
   }
   cx.restore();
-  if(flash){ cx.drawImage(flashCanvas(flash),0,0); if(--flashT<=0) flash=null; }
+  if(flash){ cx.drawImage(flashCanvas(flash),0,0); if(T>=flashEnd) flash=null; }   /* always shown for at least one frame */
   requestAnimationFrame(loop);
 }
 
