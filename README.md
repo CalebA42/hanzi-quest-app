@@ -1,6 +1,6 @@
 # 汉字冒险 · Hanzi Quest
 
-An 8-bit Mandarin reading adventure across HSK levels 1–6.
+A 16-bit Mandarin reading adventure across HSK levels 1–6.
 
 ## Play now (no download required)
 
@@ -89,6 +89,15 @@ committed before the tag; without them the workflow stops before building.
 
 opens the game in a dev window instantly. Useful when iterating on
 `index.html` (just replace it with a newer version from the developer and re-run).
+
+### Checking the art and text
+
+These need only Node, no browser. Output goes to `review/`, which git ignores.
+
+    node tools/scene-render.js out.png cave rat           # one scene as a PNG
+    node tools/scene-render.js out.png battle dog --fight --hit
+    node tools/export-sprites.js                          # review/hanzi-quest-sprites.html: every sprite, scene and background
+    node tools/export-review.js                           # review/hanzi-quest-review.html: every Chinese line, for a native speaker
 
 ## Where saves live
 
